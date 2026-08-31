@@ -33,6 +33,10 @@ jobs:
         env:
           NEXORA_BANK_API_URL: ${{ secrets.NEXORA_BANK_API_URL }}
         run: |
+          if [ -z "$NEXORA_BANK_API_URL" ]; then
+            echo "NEXORA_BANK_API_URL GitHub secret is missing. Deploy the bank backend first."
+            exit 1
+          fi
           python3 - <<'PY2'
           import os
           from pathlib import Path

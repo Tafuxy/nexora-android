@@ -1,4 +1,4 @@
-# Nexora 1.5.1
+# Nexora 1.5.2
 
 Nexora combines Planner, Money, Bills and Garage in one mobile app, with optional Open Banking sync.
 
@@ -50,8 +50,8 @@ Workflow: **Build Nexora APK**
 Artifact: `Nexora-APK` → `Nexora.apk`
 
 - package: `com.nexora.app`
-- version: `1.5.1`
-- version code: `9`
+- version: `1.5.2`
+- version code: `10`
 
 ## iOS
 
@@ -62,7 +62,7 @@ Artifact: `Nexora-iOS-IPA` → `Nexora-unsigned.ipa`
 The GitHub workflow builds an unsigned IPA. Apple still requires the IPA to be signed before installation, e.g. with an Apple Developer signing setup or a sideloading tool.
 
 - bundle id: `com.nexora.app`
-- version: `1.5.1`
+- version: `1.5.2`
 - build: `9`
 
 ## First launch
@@ -75,3 +75,18 @@ The initial setup asks for:
 4. Focus areas and security information
 
 A phone screen lock / biometric security must be configured before setup can be completed.
+
+## End-to-end setup checklist
+
+To make bank sync work in a real Android/iOS build:
+
+1. Create/get GoCardless Bank Account Data user secrets.
+2. Create a Cloudflare API token that can edit Workers and copy your Cloudflare Account ID.
+3. Add GitHub repository secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `GOCARDLESS_SECRET_ID`, `GOCARDLESS_SECRET_KEY`, `NEXORA_SESSION_SECRET`.
+4. Run **Deploy Nexora Bank Backend**.
+5. Copy the deployed Worker URL and confirm `/health` returns `configured: true`.
+6. Add the Worker base URL as GitHub secret `NEXORA_BANK_API_URL`.
+7. Run **Build Nexora APK** and/or **Build Nexora iOS IPA**.
+8. Android APK is directly installable. The iOS IPA is unsigned and must be signed before installation.
+
+Android now declares the required `INTERNET` permission. Build workflows fail with a clear message if `NEXORA_BANK_API_URL` has not been configured.

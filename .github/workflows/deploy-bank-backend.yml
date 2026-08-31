@@ -18,6 +18,21 @@ jobs:
       - name: Install Wrangler
         run: npm install --global wrangler@4
 
+      - name: Validate required secrets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          GOCARDLESS_SECRET_ID: ${{ secrets.GOCARDLESS_SECRET_ID }}
+          GOCARDLESS_SECRET_KEY: ${{ secrets.GOCARDLESS_SECRET_KEY }}
+          NEXORA_SESSION_SECRET: ${{ secrets.NEXORA_SESSION_SECRET }}
+        run: |
+          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID GOCARDLESS_SECRET_ID GOCARDLESS_SECRET_KEY NEXORA_SESSION_SECRET; do
+            if [ -z "${!name}" ]; then
+              echo "$name GitHub secret is missing."
+              exit 1
+            fi
+          done
+
       - name: Deploy Worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
