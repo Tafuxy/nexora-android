@@ -287,124 +287,58 @@ const translations = {
 
 const onboardingCopy = {
   et: {
-    welcomeTitle: 'Sinu päev, raha ja auto ühes kohas.',
-    welcomeText: 'Logi Google kontoga sisse ja Nexora seab end mõne sammuga sinu järgi paika.',
-    google: 'Jätka Google kontoga',
-    privacy: 'Nexora kasutab sisselogimiseks ainult sinu nime, e-posti ja profiilipilti.',
-    unlockTitle: 'Tere tulemast tagasi',
-    unlockText: 'Kinnita oma Google konto, et Nexora avada.',
-    signInError: 'Google sisselogimine ei õnnestunud. Proovi uuesti.',
-    signInConfig: 'Google sisselogimine pole hetkel saadaval. Proovi veidi hiljem uuesti.',
-    step: 'Samm',
-    of: '/',
-    back: 'Tagasi',
-    next: 'Edasi',
-    finish: 'Ava Nexora',
-    skip: 'Jäta praegu vahele',
+    step: 'Samm', of: '/', back: 'Tagasi', next: 'Edasi', finish: 'Ava Nexora', skip: 'Jäta praegu vahele',
     setup1Title: 'Pane Nexora enda järgi paika',
-    setup1Text: 'Vali keel ja välimus. Neid saab hiljem seadetes alati muuta.',
-    language: 'Keel',
-    estonian: 'Eesti',
-    english: 'English',
-    appearance: 'Välimus',
-    systemTheme: 'Seadme järgi',
-    darkTheme: 'Tume',
-    lightTheme: 'Hele',
+    setup1Text: 'Alustame põhilisest. Neid seadeid saad hiljem alati muuta.',
+    name: 'Sinu nimi', namePlaceholder: 'Kuidas Nexora sind kutsub?',
+    language: 'Keel', estonian: 'Eesti', english: 'English', appearance: 'Välimus',
+    systemTheme: 'Seadme järgi', darkTheme: 'Tume', lightTheme: 'Hele',
     setup2Title: 'Sinu raha ülevaade',
     setup2Text: 'Lisa ainult see, mida soovid jälgida. Kõik väljad on valikulised.',
-    monthlyBudget: 'Kuu eelarve',
-    currentSavings: 'Praegu säästetud',
-    savingsGoal: 'Säästueesmärk',
+    monthlyBudget: 'Kuu eelarve', currentSavings: 'Praegu säästetud', savingsGoal: 'Säästueesmärk',
     setup3Title: 'Lisa oma auto',
     setup3Text: 'Nii saad jälgida hooldust, läbisõitu, kindlustust ja autokulusid.',
-    vehicleName: 'Mark ja mudel',
-    plate: 'Reg nr',
-    odometer: 'Läbisõit',
-    nextService: 'Järgmine hooldus (km)',
-    insuranceDate: 'Kindlustuse lõpp',
-    inspectionDate: 'Ülevaatus',
-    setup4Title: 'Mida Nexora sinu jaoks jälgib?',
-    setup4Text: 'Vali olulisemad teemad ja pane kiire avamine paika.',
-    personal: 'Isiklikud ülesanded',
-    work: 'Töö',
-    money: 'Raha ja eelarve',
-    garage: 'Auto ja hooldus',
-    bills: 'Arved ja tähtajad',
+    vehicleName: 'Mark ja mudel', plate: 'Reg nr', odometer: 'Läbisõit', nextService: 'Järgmine hooldus (km)',
+    insuranceDate: 'Kindlustuse lõpp', inspectionDate: 'Ülevaatus',
+    setup4Title: 'Viimane samm',
+    setup4Text: 'Vali, millele Nexora keskendub, ja kuidas äpp avamisel kaitstud on.',
+    personal: 'Isiklikud ülesanded', work: 'Töö', money: 'Raha ja eelarve', garage: 'Auto ja hooldus', bills: 'Arved ja tähtajad',
     biometric: 'Kasuta sõrmejälge või näotuvastust',
-    biometricHint: 'Nexora avaneb järgmisel korral kiirelt sinu telefoni biomeetriaga.',
-    requireAuth: 'Küsi avamisel kinnitust',
-    requireAuthHint: 'Kui biomeetria pole kasutusel, küsib Nexora Google kontoga kinnitamist.',
-    account: 'Konto',
-    security: 'Turvalisus',
-    signedInWithGoogle: 'Google kontoga sisse logitud',
-    signOut: 'Logi välja',
-    enable: 'Lülita sisse',
-    disable: 'Lülita välja',
-    on: 'Sees',
-    off: 'Väljas',
-    biometricUnavailable: 'Selles telefonis pole biomeetriline avamine seadistatud.',
-    biometricCancelled: 'Biomeetrilist avamist ei muudetud.',
-    setupDone: 'Kõik on valmis'
+    biometricHint: 'Järgmisel avamisel saad Nexora kiiresti telefoni biomeetriaga avada.',
+    requireAuth: 'Lukusta Nexora avamisel',
+    requireAuthHint: 'Nexora küsib avamisel sõrmejälge, näotuvastust või telefoni ekraanilukku.',
+    security: 'Turvalisus', localData: 'Sinu andmed',
+    localDataHint: 'Nexora andmed salvestatakse praegu sellesse telefoni.',
+    enable: 'Lülita sisse', disable: 'Lülita välja', on: 'Sees', off: 'Väljas',
+    biometricUnavailable: 'Selles telefonis pole sõrmejälge või näotuvastust seadistatud.',
+    biometricCancelled: 'Biomeetrilist avamist ei muudetud.', setupDone: 'Kõik on valmis'
   },
   en: {
-    welcomeTitle: 'Your day, money and car in one place.',
-    welcomeText: 'Sign in with Google and Nexora will tailor itself to you in a few quick steps.',
-    google: 'Continue with Google',
-    privacy: 'Nexora only uses your name, email and profile picture for sign-in.',
-    unlockTitle: 'Welcome back',
-    unlockText: 'Confirm your Google Account to unlock Nexora.',
-    signInError: 'Google sign-in didn’t complete. Try again.',
-    signInConfig: 'Google sign-in is temporarily unavailable. Please try again later.',
-    step: 'Step',
-    of: '/',
-    back: 'Back',
-    next: 'Next',
-    finish: 'Open Nexora',
-    skip: 'Skip for now',
+    step: 'Step', of: '/', back: 'Back', next: 'Next', finish: 'Open Nexora', skip: 'Skip for now',
     setup1Title: 'Make Nexora yours',
-    setup1Text: 'Choose your language and appearance. You can change these later in Settings.',
-    language: 'Language',
-    estonian: 'Estonian',
-    english: 'English',
-    appearance: 'Appearance',
-    systemTheme: 'Follow device',
-    darkTheme: 'Dark',
-    lightTheme: 'Light',
+    setup1Text: 'Start with the basics. You can change these settings later.',
+    name: 'Your name', namePlaceholder: 'What should Nexora call you?',
+    language: 'Language', estonian: 'Estonian', english: 'English', appearance: 'Appearance',
+    systemTheme: 'Follow device', darkTheme: 'Dark', lightTheme: 'Light',
     setup2Title: 'Your money overview',
     setup2Text: 'Add only what you want to track. Every field is optional.',
-    monthlyBudget: 'Monthly budget',
-    currentSavings: 'Current savings',
-    savingsGoal: 'Savings goal',
+    monthlyBudget: 'Monthly budget', currentSavings: 'Current savings', savingsGoal: 'Savings goal',
     setup3Title: 'Add your car',
     setup3Text: 'Track maintenance, mileage, insurance and real car costs.',
-    vehicleName: 'Make and model',
-    plate: 'Plate',
-    odometer: 'Odometer',
-    nextService: 'Next service (km)',
-    insuranceDate: 'Insurance renewal',
-    inspectionDate: 'Inspection',
-    setup4Title: 'What should Nexora focus on?',
-    setup4Text: 'Pick what matters most and set up quick, secure access.',
-    personal: 'Personal tasks',
-    work: 'Work',
-    money: 'Money and budget',
-    garage: 'Car and maintenance',
-    bills: 'Bills and deadlines',
+    vehicleName: 'Make and model', plate: 'Plate', odometer: 'Odometer', nextService: 'Next service (km)',
+    insuranceDate: 'Insurance renewal', inspectionDate: 'Inspection',
+    setup4Title: 'One last step',
+    setup4Text: 'Choose what Nexora should focus on and how the app is protected when opened.',
+    personal: 'Personal tasks', work: 'Work', money: 'Money and budget', garage: 'Car and maintenance', bills: 'Bills and deadlines',
     biometric: 'Use fingerprint or face unlock',
-    biometricHint: 'Next time, Nexora can unlock quickly using your phone’s biometrics.',
-    requireAuth: 'Require verification on open',
-    requireAuthHint: 'If biometrics are off, Nexora asks you to confirm with Google.',
-    account: 'Account',
-    security: 'Security',
-    signedInWithGoogle: 'Signed in with Google',
-    signOut: 'Sign out',
-    enable: 'Enable',
-    disable: 'Disable',
-    on: 'On',
-    off: 'Off',
-    biometricUnavailable: 'Biometric unlock is not set up on this phone.',
-    biometricCancelled: 'Biometric unlock was not changed.',
-    setupDone: 'You’re all set'
+    biometricHint: 'Unlock Nexora quickly with your phone biometrics next time.',
+    requireAuth: 'Lock Nexora on open',
+    requireAuthHint: 'Nexora asks for fingerprint, face unlock or your phone screen lock when opened.',
+    security: 'Security', localData: 'Your data',
+    localDataHint: 'Nexora data is currently stored on this phone.',
+    enable: 'Enable', disable: 'Disable', on: 'On', off: 'Off',
+    biometricUnavailable: 'Fingerprint or face unlock is not set up on this phone.',
+    biometricCancelled: 'Biometric unlock was not changed.', setupDone: 'You’re all set'
   }
 };
 
@@ -414,13 +348,12 @@ function o(key) {
 }
 
 const cleanDefaults = {
-  account: null,
   settings: { language: '', interests: [], requireAuth: true, biometricEnabled: false },
   profile: { name: '', monthlyBudget: 0, savingsGoal: 0, savingsCurrent: 0 },
   tasks: [],
   transactions: [],
   vehicles: [],
-  meta: { firstOpen: true, setupComplete: false, appVersion: '1.2.0' }
+  meta: { firstOpen: true, setupComplete: false, appVersion: '1.3.0' }
 };
 
 const DEMO_TASKS = ['Review today’s priorities', 'Check upcoming car costs'];
@@ -429,7 +362,7 @@ const DEMO_VEHICLE = 'My car';
 
 let state = loadState();
 let currentView = 'home';
-let nativeState = { launchAuthMode: window.NexoraNative ? 'google_required' : 'none', biometricAvailable: false, biometricEnabled: false, requireAuth: true, googleConfigured: false };
+let nativeState = { authPending: false, biometricAvailable: false, biometricEnabled: false, requireAuth: true, setupComplete: false, deviceSecure: false };
 let setupStep = 1;
 let gateError = '';
 let setupDraft = {};
@@ -485,8 +418,7 @@ function sanitizeState(input) {
   s.settings.interests = Array.isArray(s.settings?.interests) ? s.settings.interests : [];
   s.settings.requireAuth = s.settings?.requireAuth !== false;
   s.settings.biometricEnabled = Boolean(s.settings?.biometricEnabled);
-  s.account = s.account && typeof s.account === 'object' ? s.account : null;
-  s.meta = { ...(s.meta || {}), appVersion: '1.2.0', firstOpen: Boolean(s.meta?.firstOpen), setupComplete: Boolean(s.meta?.setupComplete) };
+  s.meta = { ...(s.meta || {}), appVersion: '1.3.0', firstOpen: Boolean(s.meta?.firstOpen), setupComplete: Boolean(s.meta?.setupComplete) };
   return s;
 }
 
@@ -536,27 +468,7 @@ function greeting() {
 
 
 function gateNeeded() {
-  if (!state.account) return 'signin';
-  if (nativeState.launchAuthMode === 'google_required') return 'unlock';
-  if (!state.meta.setupComplete) return 'setup';
-  return '';
-}
-
-function accountAvatar(account = state.account) {
-  if (!account) return '<div class="account-photo-fallback">N</div>';
-  const initial = esc((account.name || account.email || 'N').trim().slice(0,1).toUpperCase());
-  return account.photo
-    ? `<img class="account-photo" src="${esc(account.photo)}" alt="" referrerpolicy="no-referrer">`
-    : `<div class="account-photo-fallback">${initial}</div>`;
-}
-
-function accountChip(account = state.account) {
-  if (!account) return '';
-  return `<div class="account-chip">${accountAvatar(account)}<div class="row-main"><div class="row-title">${esc(account.name || 'Google')}</div><div class="account-email">${esc(account.email || '')}</div></div></div>`;
-}
-
-function googleButton() {
-  return `<button class="google-btn" data-google-signin><span class="google-g">G</span><span>${o('google')}</span></button>`;
+  return !state.meta.setupComplete ? 'setup' : '';
 }
 
 function renderGate() {
@@ -571,34 +483,12 @@ function renderGate() {
 
   document.body.classList.add('gated');
   gate.classList.remove('hidden');
-
-  if (mode === 'signin') {
-    gate.innerHTML = `<div class="gate-shell">
-      <img class="gate-logo" src="nexora-mark.png" alt="Nexora">
-      <div class="gate-copy"><h1>${o('welcomeTitle')}</h1><p>${o('welcomeText')}</p></div>
-      ${gateError ? `<div class="gate-error">${esc(gateError)}</div>` : ''}
-      ${googleButton()}
-      <div class="gate-note">${o('privacy')}</div>
-    </div>`;
-  } else if (mode === 'unlock') {
-    gate.innerHTML = `<div class="gate-shell">
-      <img class="gate-wordmark dark-logo" src="nexora-wordmark-dark.png" alt="Nexora">
-      <img class="gate-wordmark light-logo" src="nexora-wordmark-light.png" alt="Nexora">
-      <div class="gate-copy"><h1>${o('unlockTitle')}</h1><p>${o('unlockText')}</p></div>
-      ${accountChip()}
-      ${gateError ? `<div class="gate-error">${esc(gateError)}</div>` : ''}
-      ${googleButton()}
-    </div>`;
-  } else {
-    gate.innerHTML = setupMarkup();
-  }
-
+  gate.innerHTML = setupMarkup();
   bindGate();
 }
 
 function setupMarkup() {
   const progress = Math.max(1, Math.min(4, setupStep)) * 25;
-  const account = state.account || {};
   const langValue = setupDraft.language || state.settings.language || lang();
   const themeValue = setupDraft.theme || localStorage.getItem('nexora-theme') || 'system';
   const interests = setupDraft.interests || state.settings.interests || [];
@@ -608,7 +498,7 @@ function setupMarkup() {
   if (setupStep === 1) {
     body = `<div class="setup-card">
       <h2>${o('setup1Title')}</h2><p>${o('setup1Text')}</p>
-      ${accountChip(account)}
+      <div class="field"><label>${o('name')}</label><input id="setupName" value="${esc(setupDraft.name ?? state.profile.name ?? '')}" placeholder="${o('namePlaceholder')}"></div>
       <div class="field"><label>${o('language')}</label><select id="setupLanguage"><option value="et" ${langValue==='et'?'selected':''}>${o('estonian')}</option><option value="en" ${langValue==='en'?'selected':''}>${o('english')}</option></select></div>
       <div class="field"><label>${o('appearance')}</label><div class="choice-grid">
         <button type="button" class="choice ${themeValue==='system'?'active':''}" data-theme-choice="system"><b>${o('systemTheme')}</b><span>Android</span></button>
@@ -659,6 +549,7 @@ function setupMarkup() {
 
 function saveCurrentSetupStep() {
   if (setupStep === 1) {
+    setupDraft.name = String($('#setupName')?.value || '').trim();
     setupDraft.language = $('#setupLanguage')?.value || lang();
   } else if (setupStep === 2) {
     setupDraft.monthlyBudget = Number($('#setupBudget')?.value || 0);
@@ -682,7 +573,7 @@ function finishSetup() {
   state.settings.language = setupDraft.language || state.settings.language || lang();
   state.settings.interests = setupDraft.interests || [];
   state.settings.requireAuth = setupDraft.requireAuth !== false;
-  state.profile.name = state.profile.name || state.account?.name || '';
+  state.profile.name = setupDraft.name || state.profile.name || '';
   state.profile.monthlyBudget = Number(setupDraft.monthlyBudget || 0);
   state.profile.savingsCurrent = Number(setupDraft.savingsCurrent || 0);
   state.profile.savingsGoal = Number(setupDraft.savingsGoal || 0);
@@ -702,6 +593,7 @@ function finishSetup() {
 
   state.meta.setupComplete = true;
   state.meta.firstOpen = false;
+  try { window.NexoraNative?.setSetupComplete(true); } catch {}
   if (setupDraft.theme === 'dark' || setupDraft.theme === 'light') {
     localStorage.setItem('nexora-theme', setupDraft.theme);
     document.documentElement.classList.toggle('light', setupDraft.theme === 'light');
@@ -724,11 +616,6 @@ function finishSetup() {
 }
 
 function bindGate() {
-  $('[data-google-signin]')?.addEventListener('click', () => {
-    gateError = '';
-    try { window.NexoraNative?.startGoogleSignIn(); }
-    catch { gateError = o('signInError'); renderGate(); }
-  });
   $$('[data-theme-choice]').forEach(btn => btn.addEventListener('click', () => {
     setupDraft.theme = btn.dataset.themeChoice;
     renderGate();
@@ -769,46 +656,22 @@ window.NexoraApp = {
     nativeState = {...nativeState, ...(next || {})};
     state.settings.biometricEnabled = Boolean(nativeState.biometricEnabled);
     state.settings.requireAuth = nativeState.requireAuth !== false;
-    saveState(false);
-    renderGate();
-  },
-  onGoogleAccount(account) {
-    if (!account?.email) return;
-    const previousEmail = state.account?.email || state.meta?.lastAccountEmail || '';
-    state.account = {...account};
-    state.meta.lastAccountEmail = account.email;
-    if (!state.profile.name) state.profile.name = account.name || '';
-    if (previousEmail && previousEmail !== account.email) {
-      state.profile = {name: account.name || '', monthlyBudget: 0, savingsGoal: 0, savingsCurrent: 0};
-      state.tasks = [];
-      state.transactions = [];
-      state.vehicles = [];
-      state.settings.interests = [];
-      state.meta.setupComplete = false;
-      setupStep = 1;
+    if (state.meta.setupComplete && !nativeState.setupComplete) {
+      try { window.NexoraNative?.setSetupComplete(true); } catch {}
     }
-    nativeState.launchAuthMode = 'authenticated';
-    gateError = '';
     saveState(false);
-    render();
-  },
-  onGoogleSignInError(code) {
-    gateError = code === 'configuration' ? o('signInConfig') : o('signInError');
     renderGate();
   },
   onBiometricResult(result) {
     state.settings.biometricEnabled = Boolean(result?.enabled);
     nativeState.biometricEnabled = Boolean(result?.enabled);
+    if (result?.enabled) {
+      state.settings.requireAuth = true;
+      nativeState.requireAuth = true;
+      try { window.NexoraNative?.setRequireAuth(true); } catch {}
+    }
     saveState(false);
     if (result?.status === 'unavailable') gateError = o('biometricUnavailable');
-    render();
-  },
-  onSignedOut() {
-    state.meta.lastAccountEmail = state.account?.email || state.meta?.lastAccountEmail || '';
-    state.account = null;
-    nativeState.launchAuthMode = 'google_required';
-    setupStep = 1;
-    saveState(false);
     render();
   }
 };
@@ -1031,13 +894,11 @@ const views = {
       <section class="card brand-card">
         <img class="brand-wordmark dark-logo" src="nexora-wordmark-dark.png" alt="Nexora" />
         <img class="brand-wordmark light-logo" src="nexora-wordmark-light.png" alt="Nexora" />
-        <div class="brand-version">Nexora · 1.2.0</div>
+        <div class="brand-version">Nexora · 1.3.0</div>
       </section>
       <section class="card">
-        <div class="section-title"><h3>${o('account')}</h3><span class="pill">Google</span></div>
-        <div class="settings-account" style="margin-top:12px">${accountAvatar()}<div class="row-main"><div class="row-title">${esc(state.account?.name || p.name || 'Nexora')}</div><div class="account-email">${esc(state.account?.email || '')}</div></div></div>
-        <div class="small muted" style="margin-top:12px">${o('signedInWithGoogle')}</div>
-        <div class="actions" style="margin-top:14px"><button class="danger" data-signout>${o('signOut')}</button></div>
+        <div class="section-title"><h3>${o('localData')}</h3></div>
+        <div class="settings-account" style="margin-top:12px"><div class="account-photo-fallback">${esc((p.name || 'N').slice(0,1).toUpperCase())}</div><div class="row-main"><div class="row-title">${esc(p.name || 'Nexora')}</div><div class="account-email">${o('localDataHint')}</div></div></div>
       </section>
       <section class="card">
         <div class="section-title"><h3>${o('security')}</h3></div>
@@ -1184,10 +1045,6 @@ function bindView() {
   $('[data-open-settings]')?.addEventListener('click', openSettings);
   $('[data-export]')?.addEventListener('click', exportData);
   $('[data-reset]')?.addEventListener('click', resetData);
-  $('[data-signout]')?.addEventListener('click', () => {
-    try { window.NexoraNative?.signOut(); }
-    catch { window.NexoraApp.onSignedOut(); }
-  });
   $('[data-toggle-biometric]')?.addEventListener('click', () => {
     if (!nativeState.biometricAvailable) {
       gateError = o('biometricUnavailable');
@@ -1217,18 +1074,15 @@ function exportData() {
 
 function resetData() {
   if (!confirm(t('resetConfirm'))) return;
-  const account = state.account ? {...state.account} : null;
   const language = state.settings.language;
-  const requireAuth = state.settings.requireAuth;
-  const biometricEnabled = state.settings.biometricEnabled;
   state = clone(cleanDefaults);
-  state.account = account;
   state.settings.language = language;
-  state.settings.requireAuth = requireAuth;
-  state.settings.biometricEnabled = biometricEnabled;
-  state.profile.name = account?.name || '';
-  state.meta.setupComplete = Boolean(account);
-  state.meta.firstOpen = false;
+  try {
+    window.NexoraNative?.setSetupComplete(false);
+    window.NexoraNative?.disableBiometric();
+    window.NexoraNative?.setRequireAuth(true);
+  } catch {}
+  setupStep = 1;
   closeModal();
   saveState();
 }
