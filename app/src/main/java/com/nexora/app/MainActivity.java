@@ -15,6 +15,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.CancellationSignal;
+import android.provider.Settings;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
@@ -25,6 +26,7 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
+import android.widget.Toast;
 
 import org.json.JSONObject;
 
@@ -33,7 +35,6 @@ import java.util.concurrent.Executor;
 public class MainActivity extends Activity {
     private static final String PREFS = "nexora_security";
     private static final String PREF_BIOMETRIC = "biometric_enabled";
-    private static final String PREF_REQUIRE_AUTH = "require_auth";
     private static final String PREF_SETUP_COMPLETE = "setup_complete";
     private static final int REQUEST_DEVICE_CREDENTIAL = 4102;
 
@@ -41,7 +42,10 @@ public class MainActivity extends Activity {
     private FrameLayout root;
     private SharedPreferences prefs;
     private boolean pageReady = false;
-    private boolean launchAuthPending = false;
+    private boolean authPending = false;
+    private boolean authenticationInProgress = false;
+    private boolean authenticatedForForeground = false;
+    private boolean bankReturnPending = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -53,17 +57,36 @@ public class MainActivity extends Activity {
         setupContent();
         setupWebView();
 
-        if (shouldAuthenticateOnLaunch()) {
-            launchAuthPending = true;
-            webView.setVisibility(View.INVISIBLE);
-            authenticateForLaunch();
-        }
+        captureBankReturn(getIntent());
+        if (isSetupComplete()) lockForPrivacy();
 
         if (savedInstanceState != null) {
             webView.restoreState(savedInstanceState);
         } else {
             webView.loadUrl("file:///android_asset/www/index.html");
         }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (isSetupComplete() && !authenticatedForForeground && !authenticationInProgress) {
+            authenticateForLaunch();
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        // Hide all personal and bank data before Android captures the recent-apps snapshot.
+        if (isSetupComplete() && !authenticationInProgress) {
+            authenticatedForForeground = false;
+            lockForPrivacy();
+        }
+        super.onPause();
+    }
+
+    private boolean isSetupComplete() {
+        return prefs.getBoolean(PREF_SETUP_COMPLETE, false);
     }
 
     private void configureSystemBars() {
@@ -142,8 +165,13 @@ public class MainActivity extends Activity {
                 String scheme = uri.getScheme();
                 if (scheme != null && (
                         scheme.equals("http") || scheme.equals("https") ||
-                        scheme.equals("mailto") || scheme.equals("tel")
+                        scheme.equals("mailto") || scheme.equals("tel") || scheme.equals("nexora")
                 )) {
+                    if (scheme.equals("nexora")) {
+                        // The bank authorization browser redirects back here. The app remains locked
+                        // until Android authentication succeeds again.
+                        return true;
+                    }
                     try {
                         startActivity(new Intent(Intent.ACTION_VIEW, uri));
                     } catch (ActivityNotFoundException ignored) {
@@ -165,11 +193,6 @@ public class MainActivity extends Activity {
         root.requestApplyInsets();
     }
 
-    private boolean shouldAuthenticateOnLaunch() {
-        return prefs.getBoolean(PREF_SETUP_COMPLETE, false)
-                && prefs.getBoolean(PREF_REQUIRE_AUTH, true);
-    }
-
     private boolean isBiometricAvailableInternal() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             BiometricManager manager = (BiometricManager) getSystemService(Context.BIOMETRIC_SERVICE);
@@ -187,18 +210,28 @@ public class MainActivity extends Activity {
         return km != null && km.isDeviceSecure();
     }
 
+    private void lockForPrivacy() {
+        authPending = true;
+        if (webView != null) webView.setVisibility(View.INVISIBLE);
+        emitNativeState();
+    }
+
     private void authenticateForLaunch() {
-        boolean preferBiometric = prefs.getBoolean(PREF_BIOMETRIC, false);
-        if (preferBiometric && isBiometricAvailableInternal()) {
-            showBiometricPrompt(true);
+        lockForPrivacy();
+        authenticationInProgress = true;
+
+        // Always prefer fingerprint / face unlock. Device PIN/pattern is only a fallback.
+        if (isBiometricAvailableInternal()) {
+            showBiometricPrompt();
         } else if (isDeviceSecure()) {
             showDeviceCredential();
         } else {
-            finishLaunchAuthentication();
+            authenticationInProgress = false;
+            showSecurityRequired();
         }
     }
 
-    private void showBiometricPrompt(boolean launchUnlock) {
+    private void showBiometricPrompt() {
         Executor executor = getMainExecutor();
         CancellationSignal cancellationSignal = new CancellationSignal();
         android.hardware.biometrics.BiometricPrompt.Builder builder =
@@ -206,20 +239,15 @@ public class MainActivity extends Activity {
                         .setTitle("Nexora")
                         .setSubtitle("Unlock Nexora");
 
-        if (launchUnlock && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && isDeviceSecure()) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && isDeviceSecure()) {
             builder.setDeviceCredentialAllowed(true);
         } else {
             builder.setNegativeButton(
-                    launchUnlock && isDeviceSecure() ? "Use phone unlock" : "Cancel",
+                    isDeviceSecure() ? "Use phone unlock" : "Cancel",
                     executor,
                     (DialogInterface dialog, int which) -> {
-                        if (launchUnlock && isDeviceSecure()) {
-                            showDeviceCredential();
-                        } else if (!launchUnlock) {
-                            emitBiometricResult(false, "cancelled");
-                        } else {
-                            finishAndRemoveTask();
-                        }
+                        if (isDeviceSecure()) showDeviceCredential();
+                        else lockAndClose();
                     }
             );
         }
@@ -229,26 +257,16 @@ public class MainActivity extends Activity {
             @Override
             public void onAuthenticationSucceeded(android.hardware.biometrics.BiometricPrompt.AuthenticationResult result) {
                 super.onAuthenticationSucceeded(result);
-                if (launchUnlock) {
-                    finishLaunchAuthentication();
-                } else {
-                    prefs.edit().putBoolean(PREF_BIOMETRIC, true).apply();
-                    emitBiometricResult(true, "enabled");
-                    emitNativeState();
-                }
+                finishLaunchAuthentication();
             }
 
             @Override
             public void onAuthenticationError(int errorCode, CharSequence errString) {
                 super.onAuthenticationError(errorCode, errString);
-                if (launchUnlock) {
-                    if (isDeviceSecure() && Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-                        showDeviceCredential();
-                    } else {
-                        finishAndRemoveTask();
-                    }
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q && isDeviceSecure()) {
+                    showDeviceCredential();
                 } else {
-                    emitBiometricResult(false, "cancelled");
+                    lockAndClose();
                 }
             }
         });
@@ -257,46 +275,63 @@ public class MainActivity extends Activity {
     private void showDeviceCredential() {
         KeyguardManager km = (KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
         if (km == null || !km.isDeviceSecure()) {
-            finishLaunchAuthentication();
+            authenticationInProgress = false;
+            showSecurityRequired();
             return;
         }
         Intent intent = km.createConfirmDeviceCredentialIntent("Nexora", "Unlock Nexora");
         if (intent != null) {
             startActivityForResult(intent, REQUEST_DEVICE_CREDENTIAL);
         } else {
-            finishLaunchAuthentication();
+            authenticationInProgress = false;
+            showSecurityRequired();
+        }
+    }
+
+    private void showSecurityRequired() {
+        lockForPrivacy();
+        Toast.makeText(this, "Set up fingerprint, face unlock or a phone screen lock to use Nexora.", Toast.LENGTH_LONG).show();
+        try {
+            Intent intent = new Intent(Settings.ACTION_SECURITY_SETTINGS);
+            startActivity(intent);
+        } catch (Exception ignored) {
+            finishAndRemoveTask();
         }
     }
 
     private void finishLaunchAuthentication() {
-        launchAuthPending = false;
+        authenticationInProgress = false;
+        authenticatedForForeground = true;
+        authPending = false;
+        prefs.edit().putBoolean(PREF_BIOMETRIC, isBiometricAvailableInternal()).apply();
         if (webView != null) webView.setVisibility(View.VISIBLE);
         emitNativeState();
+        if (bankReturnPending) {
+            bankReturnPending = false;
+            evaluate("window.NexoraApp && window.NexoraApp.onBankReturn && window.NexoraApp.onBankReturn();");
+        }
+    }
+
+    private void lockAndClose() {
+        authenticationInProgress = false;
+        authenticatedForForeground = false;
+        lockForPrivacy();
+        finishAndRemoveTask();
     }
 
     private void emitNativeState() {
         if (!pageReady || webView == null) return;
         JSONObject state = new JSONObject();
         try {
-            state.put("authPending", launchAuthPending);
+            state.put("authPending", authPending);
             state.put("biometricAvailable", isBiometricAvailableInternal());
-            state.put("biometricEnabled", prefs.getBoolean(PREF_BIOMETRIC, false));
-            state.put("requireAuth", prefs.getBoolean(PREF_REQUIRE_AUTH, true));
-            state.put("setupComplete", prefs.getBoolean(PREF_SETUP_COMPLETE, false));
+            state.put("biometricEnabled", isBiometricAvailableInternal());
+            state.put("requireAuth", true);
+            state.put("setupComplete", isSetupComplete());
             state.put("deviceSecure", isDeviceSecure());
         } catch (Exception ignored) {
         }
         evaluate("window.NexoraApp && window.NexoraApp.onNativeState(" + state + ");");
-    }
-
-    private void emitBiometricResult(boolean enabled, String status) {
-        JSONObject result = new JSONObject();
-        try {
-            result.put("enabled", enabled);
-            result.put("status", status);
-        } catch (Exception ignored) {
-        }
-        evaluate("window.NexoraApp && window.NexoraApp.onBiometricResult(" + result + ");");
     }
 
     private void evaluate(String script) {
@@ -313,40 +348,64 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public boolean isBiometricEnabled() {
-            return prefs.getBoolean(PREF_BIOMETRIC, false);
+            return isBiometricAvailableInternal();
         }
 
         @JavascriptInterface
         public boolean isAuthRequired() {
-            return prefs.getBoolean(PREF_REQUIRE_AUTH, true);
+            return true;
         }
 
         @JavascriptInterface
+        public boolean isDeviceSecure() {
+            return MainActivity.this.isDeviceSecure();
+        }
+
+        // Kept for compatibility with older bundled UI. Security cannot be disabled.
+        @JavascriptInterface
         public void enableBiometric() {
-            runOnUiThread(() -> {
-                if (isBiometricAvailableInternal()) showBiometricPrompt(false);
-                else emitBiometricResult(false, "unavailable");
-            });
+            prefs.edit().putBoolean(PREF_BIOMETRIC, isBiometricAvailableInternal()).apply();
+            emitNativeState();
         }
 
         @JavascriptInterface
         public void disableBiometric() {
-            prefs.edit().putBoolean(PREF_BIOMETRIC, false).apply();
-            emitBiometricResult(false, "disabled");
             emitNativeState();
         }
 
         @JavascriptInterface
         public void setRequireAuth(boolean enabled) {
-            prefs.edit().putBoolean(PREF_REQUIRE_AUTH, enabled).apply();
             emitNativeState();
         }
 
         @JavascriptInterface
         public void setSetupComplete(boolean complete) {
             prefs.edit().putBoolean(PREF_SETUP_COMPLETE, complete).apply();
+            if (!complete) {
+                authenticatedForForeground = false;
+                authPending = false;
+                if (webView != null) webView.setVisibility(View.VISIBLE);
+            }
             emitNativeState();
         }
+    }
+
+
+    private void captureBankReturn(Intent intent) {
+        if (intent == null) return;
+        Uri data = intent.getData();
+        if (data != null && "nexora".equalsIgnoreCase(data.getScheme()) && "bank-connected".equalsIgnoreCase(data.getHost())) {
+            bankReturnPending = true;
+            authenticatedForForeground = false;
+            lockForPrivacy();
+        }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        captureBankReturn(intent);
     }
 
     @Override
@@ -354,7 +413,7 @@ public class MainActivity extends Activity {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQUEST_DEVICE_CREDENTIAL) {
             if (resultCode == RESULT_OK) finishLaunchAuthentication();
-            else finishAndRemoveTask();
+            else lockAndClose();
         }
     }
 

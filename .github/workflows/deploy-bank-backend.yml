@@ -1,0 +1,37 @@
+name: Deploy Nexora Bank Backend
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Wrangler
+        run: npm install --global wrangler@4
+
+      - name: Deploy Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: wrangler deploy --config backend/wrangler.toml
+
+      - name: Configure Worker secrets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          GOCARDLESS_SECRET_ID: ${{ secrets.GOCARDLESS_SECRET_ID }}
+          GOCARDLESS_SECRET_KEY: ${{ secrets.GOCARDLESS_SECRET_KEY }}
+          NEXORA_SESSION_SECRET: ${{ secrets.NEXORA_SESSION_SECRET }}
+        run: |
+          printf '%s' "$GOCARDLESS_SECRET_ID" | wrangler secret put GOCARDLESS_SECRET_ID --config backend/wrangler.toml
+          printf '%s' "$GOCARDLESS_SECRET_KEY" | wrangler secret put GOCARDLESS_SECRET_KEY --config backend/wrangler.toml
+          printf '%s' "$NEXORA_SESSION_SECRET" | wrangler secret put NEXORA_SESSION_SECRET --config backend/wrangler.toml

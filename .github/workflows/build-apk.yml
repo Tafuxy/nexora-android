@@ -29,6 +29,18 @@ jobs:
         with:
           gradle-version: '8.11.1'
 
+      - name: Configure bank API
+        env:
+          NEXORA_BANK_API_URL: ${{ secrets.NEXORA_BANK_API_URL }}
+        run: |
+          python3 - <<'PY2'
+          import os
+          from pathlib import Path
+          p = Path('app/src/main/assets/www/config.js')
+          url = os.environ.get('NEXORA_BANK_API_URL', '').strip().rstrip('/')
+          p.write_text(p.read_text().replace('__NEXORA_BANK_API_URL__', url))
+          PY2
+
       - name: Build APK
         run: gradle :app:assembleDebug --no-daemon
 

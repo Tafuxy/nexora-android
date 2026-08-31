@@ -1,0 +1,64 @@
+name: Build Nexora iOS IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Sync shared Nexora UI
+        run: |
+          rm -rf ios/Resources/www
+          cp -R app/src/main/assets/www ios/Resources/www
+
+      - name: Configure bank API
+        env:
+          NEXORA_BANK_API_URL: ${{ secrets.NEXORA_BANK_API_URL }}
+        run: |
+          python3 - <<'PY2'
+          import os
+          from pathlib import Path
+          p = Path('ios/Resources/www/config.js')
+          url = os.environ.get('NEXORA_BANK_API_URL', '').strip().rstrip('/')
+          p.write_text(p.read_text().replace('__NEXORA_BANK_API_URL__', url))
+          PY2
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Build unsigned iOS app
+        working-directory: ios
+        run: |
+          xcodebuild \
+            -project Nexora.xcodeproj \
+            -scheme Nexora \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Package unsigned IPA
+        working-directory: ios
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/Nexora.app Payload/Nexora.app
+          zip -r Nexora-unsigned.ipa Payload
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nexora-iOS-IPA
+          path: ios/Nexora-unsigned.ipa
