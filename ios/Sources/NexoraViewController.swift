@@ -240,6 +240,16 @@ final class NexoraViewController: UIViewController, WKNavigationDelegate, WKScri
         case "enableBiometric", "disableBiometric", "setRequireAuth":
             // Kept for compatibility with the shared UI. App lock is mandatory and cannot be disabled.
             emitNativeState()
+        case "openExternal":
+            if let raw = body["url"] as? String, let url = URL(string: raw), ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
+                UIApplication.shared.open(url)
+            }
+        case "updateNotificationConfig":
+            if let json = body["json"] as? String {
+                NotificationCoordinator.shared.updateConfig(json: json)
+            }
+        case "requestNotificationPermission":
+            NotificationCoordinator.shared.requestPermission()
         default:
             break
         }
@@ -270,7 +280,10 @@ final class NexoraViewController: UIViewController, WKNavigationDelegate, WKScri
       enableBiometric: function(){ window.webkit.messageHandlers.nexora.postMessage({action:'enableBiometric'}); },
       disableBiometric: function(){ window.webkit.messageHandlers.nexora.postMessage({action:'disableBiometric'}); },
       setRequireAuth: function(v){ window.webkit.messageHandlers.nexora.postMessage({action:'setRequireAuth', value:!!v}); },
-      setSetupComplete: function(v){ window.webkit.messageHandlers.nexora.postMessage({action:'setSetupComplete', value:!!v}); }
+      setSetupComplete: function(v){ window.webkit.messageHandlers.nexora.postMessage({action:'setSetupComplete', value:!!v}); },
+      openExternal: function(url){ window.webkit.messageHandlers.nexora.postMessage({action:'openExternal', url:String(url||'')}); },
+      updateNotificationConfig: function(json){ window.webkit.messageHandlers.nexora.postMessage({action:'updateNotificationConfig', json:String(json||'{}')}); },
+      requestNotificationPermission: function(){ window.webkit.messageHandlers.nexora.postMessage({action:'requestNotificationPermission'}); }
     };
     """
 }

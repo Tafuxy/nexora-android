@@ -16,6 +16,33 @@ export default {
         });
       }
 
+      if (url.pathname === '/privacy' && request.method === 'GET') {
+        return legalPage('Privacy Policy', `
+          <p>Nexora helps you manage personal finances, recurring bills and vehicle information.</p>
+          <h2>Bank information</h2>
+          <p>When you connect a bank, account information is accessed through Enable Banking with your explicit bank authorization. Nexora does not receive or store your online banking password.</p>
+          <p>The mobile app may periodically synchronize connected account balances and transactions in the background so it can keep your overview current and notify you about new account activity. Bank access can be disconnected from Nexora at any time.</p>
+          <h2>Device data</h2>
+          <p>Your Nexora data is primarily stored on your device. Biometric templates are handled only by Android or iOS and are never available to Nexora.</p>
+          <h2>Notifications</h2>
+          <p>If you allow notifications, Nexora may alert you about incoming or outgoing money, bill due dates, spending limits, vehicle service, insurance and inspection dates. Notification detail level can be changed in Nexora settings.</p>
+          <h2>Contact</h2>
+          <p>For data protection questions, contact the email address registered for the Nexora Enable Banking application.</p>
+        `);
+      }
+
+      if (url.pathname === '/terms' && request.method === 'GET') {
+        return legalPage('Terms of Service', `
+          <p>Nexora is a personal finance, planning and vehicle-management application.</p>
+          <h2>Your responsibility</h2>
+          <p>You remain responsible for checking payments, balances, due dates and other financial information with the original provider. Synchronization can be delayed by banks, device background restrictions or network availability.</p>
+          <h2>Bank connections</h2>
+          <p>Bank connections are provided through Enable Banking and remain subject to your bank's authorization and applicable account-information-service rules.</p>
+          <h2>Availability</h2>
+          <p>Nexora may change or temporarily interrupt features for security, maintenance or provider compatibility.</p>
+        `);
+      }
+
       if (url.pathname === '/bank/callback' && request.method === 'GET') {
         return await bankCallback(url, env);
       }
@@ -108,6 +135,8 @@ export default {
 
         const accounts = [];
         const transactions = [];
+        const warnings = [];
+        const psuHeaders = buildPsuHeaders(request);
         for (const accountId of session.accounts || []) {
           const [details, balances] = await Promise.all([
             safeEb(env, `/accounts/${encodeURIComponent(accountId)}/details`),
@@ -115,18 +144,23 @@ export default {
           ]);
 
           const selectedBalance = pickBalance(balances?.balances || []);
+          const bankAlias = String(payload?.aliases?.[accountId] || accountAliasFromResource(details) || '').trim();
+          const typeCode = String(payload?.account_types?.[accountId] || accountTypeCode(details) || '').trim();
           accounts.push({
             id: accountId,
             iban: details?.account_id?.iban || '',
-            name: details?.details || details?.product || details?.name || 'Bank account',
+            display_name: bankAlias,
+            name: bankAlias || details?.details || details?.product || 'Bank account',
+            account_type: typeCode,
             owner_name: details?.name || '',
             currency: selectedBalance?.currency || details?.currency || 'EUR',
             balance: numberOrNull(selectedBalance?.amount),
             institution_id: session.aspsp?.name || payload.bank || ''
           });
 
-          const txList = await fetchTransactions(env, accountId);
-          for (const raw of txList) {
+          const txResult = await fetchTransactions(env, accountId, psuHeaders);
+          if (txResult.warning) warnings.push(`${accountId}: ${txResult.warning}`);
+          for (const raw of txResult.transactions) {
             const normalized = normalizeTransaction(raw, accountId);
             if (normalized) transactions.push(normalized);
           }
@@ -139,6 +173,8 @@ export default {
           institution_id: session.aspsp?.name || payload.bank || '',
           accounts,
           transactions,
+          transaction_count: transactions.length,
+          warnings,
           synced_at: new Date().toISOString()
         });
       }
@@ -162,6 +198,12 @@ export default {
     }
   }
 };
+
+function legalPage(title, body) {
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Nexora · ${title}</title><style>
+  :root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#090b0f;color:#f5f7fb;font:16px/1.65 system-ui,-apple-system,Segoe UI,sans-serif}.wrap{width:min(760px,calc(100% - 36px));margin:0 auto;padding:54px 0 80px}.brand{font-size:14px;font-weight:800;color:#8c82ff;letter-spacing:.08em;text-transform:uppercase}h1{font-size:38px;line-height:1.05;margin:12px 0 26px}h2{font-size:19px;margin:30px 0 8px}p{color:#b6bdc9}a{color:#8c82ff}.card{background:#11151b;border:1px solid rgba(255,255,255,.08);border-radius:24px;padding:28px}</style></head><body><main class="wrap"><div class="brand">Nexora</div><h1>${title}</h1><div class="card">${body}</div></main></body></html>`;
+  return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=3600' } });
+}
 
 function configured(env) {
   return Boolean(env.ENABLEBANKING_APP_ID && env.ENABLEBANKING_PRIVATE_KEY && env.NEXORA_SESSION_SECRET);
@@ -261,20 +303,60 @@ function pemToDer(pem, label) {
   return bytes.buffer;
 }
 
-async function fetchTransactions(env, accountId) {
-  const out = [];
-  const dateFrom = new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString().slice(0, 10);
-  let continuation = '';
-  for (let page = 0; page < 8; page++) {
-    const qs = new URLSearchParams({ date_from: dateFrom });
-    if (continuation) qs.set('continuation_key', continuation);
-    const data = await safeEb(env, `/accounts/${encodeURIComponent(accountId)}/transactions?${qs.toString()}`);
-    if (!data) break;
-    out.push(...(Array.isArray(data.transactions) ? data.transactions : []));
-    continuation = String(data.continuation_key || '');
-    if (!continuation) break;
+async function fetchTransactions(env, accountId, psuHeaders = {}) {
+  const dateFrom = new Date(Date.now() - 120 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+  const attempts = [
+    { date_from: dateFrom, strategy: 'longest' },
+    { date_from: dateFrom },
+    { strategy: 'longest' },
+    {}
+  ];
+  let lastError = null;
+
+  for (const baseParams of attempts) {
+    try {
+      const out = [];
+      const seen = new Set();
+      let continuation = '';
+      for (let page = 0; page < 10; page++) {
+        const qs = new URLSearchParams(baseParams);
+        if (continuation) qs.set('continuation_key', continuation);
+        const data = await eb(env, `/accounts/${encodeURIComponent(accountId)}/transactions?${qs.toString()}`, { headers: psuHeaders });
+        for (const tx of (Array.isArray(data.transactions) ? data.transactions : [])) {
+          const key = String(tx?.transaction_id || tx?.entry_reference || JSON.stringify(tx));
+          if (seen.has(key)) continue;
+          seen.add(key);
+          out.push(tx);
+        }
+        continuation = String(data.continuation_key || '');
+        if (!continuation) break;
+      }
+      return { transactions: out, warning: '' };
+    } catch (err) {
+      lastError = err;
+    }
   }
-  return out;
+
+  return { transactions: [], warning: lastError?.message || 'Transactions could not be fetched' };
+}
+
+function buildPsuHeaders(request) {
+  const input = request?.headers || new Headers();
+  const ip = input.get('CF-Connecting-IP') || input.get('X-Forwarded-For') || '';
+  const ua = input.get('User-Agent') || 'Nexora Mobile';
+  const accept = input.get('Accept') || 'application/json';
+  const lang = input.get('Accept-Language') || 'et-EE,en;q=0.8';
+  const encoding = input.get('Accept-Encoding') || 'gzip, br';
+  const origin = new URL(request.url).origin;
+  const h = {};
+  if (ip) h['Psu-Ip-Address'] = ip.split(',')[0].trim();
+  h['Psu-User-Agent'] = ua;
+  h['Psu-Referer'] = origin;
+  h['Psu-Accept'] = accept;
+  h['Psu-Accept-Charset'] = 'utf-8';
+  h['Psu-Accept-Encoding'] = encoding;
+  h['Psu-Accept-language'] = lang;
+  return h;
 }
 
 function pickBalance(list) {
@@ -291,27 +373,33 @@ function numberOrNull(v) {
 }
 
 function normalizeTransaction(raw, accountId) {
-  const absAmount = Number(raw?.transaction_amount?.amount);
-  if (!Number.isFinite(absAmount)) return null;
+  const amountObj = raw?.transaction_amount || raw?.transactionAmount || {};
+  const amountValue = Number(amountObj.amount);
+  if (!Number.isFinite(amountValue) || amountValue === 0) return null;
 
-  const isCredit = String(raw.credit_debit_indicator || '').toUpperCase() === 'CRDT';
-  const signedAmount = isCredit ? Math.abs(absAmount) : -Math.abs(absAmount);
-  const date = raw.booking_date || raw.value_date || raw.transaction_date || new Date().toISOString().slice(0, 10);
-  const partyName = isCredit ? raw?.debtor?.name : raw?.creditor?.name;
-  const remittance = Array.isArray(raw.remittance_information) ? raw.remittance_information.filter(Boolean).join(' · ') : String(raw.remittance_information || '');
-  const bankCode = [raw?.bank_transaction_code?.description, raw?.bank_transaction_code?.code, raw?.bank_transaction_code?.sub_code].filter(Boolean).join(' ');
-  const note = [remittance, raw.note, raw.reference_number, bankCode].filter(Boolean).join(' · ').slice(0, 300);
+  const indicator = String(raw?.credit_debit_indicator || raw?.creditDebitIndicator || '').toUpperCase();
+  const isCredit = ['CRDT', 'CREDIT', 'CREDITOR'].includes(indicator) || (!indicator && amountValue > 0);
+  const signedAmount = isCredit ? Math.abs(amountValue) : -Math.abs(amountValue);
+  const date = raw.booking_date || raw.bookingDate || raw.value_date || raw.valueDate || raw.transaction_date || raw.transactionDate || new Date().toISOString().slice(0, 10);
+  const debtor = raw?.debtor?.name || raw?.debtorName || '';
+  const creditor = raw?.creditor?.name || raw?.creditorName || '';
+  const partyName = isCredit ? debtor : creditor;
+  const remittanceRaw = raw.remittance_information ?? raw.remittanceInformation ?? '';
+  const remittance = Array.isArray(remittanceRaw) ? remittanceRaw.filter(Boolean).join(' · ') : String(remittanceRaw || '');
+  const btc = raw?.bank_transaction_code || raw?.bankTransactionCode || {};
+  const bankCode = [btc.description, btc.code, btc.sub_code || btc.subCode].filter(Boolean).join(' ');
+  const note = [remittance, raw.note, raw.reference_number || raw.referenceNumber, bankCode].filter(Boolean).join(' · ').slice(0, 300);
   const merchant = cleanMerchant(partyName || remittance || raw.note || bankCode || 'Bank transaction');
   const status = String(raw.status || '').toUpperCase();
   const pending = status && !['BOOK', 'ACCC', 'ACSC'].includes(status);
-  const txId = raw.entry_reference || raw.transaction_id || `${date}:${signedAmount}:${merchant}:${raw.reference_number || ''}`;
+  const txId = raw.entry_reference || raw.entryReference || raw.transaction_id || raw.transactionId || `${date}:${signedAmount}:${merchant}:${raw.reference_number || raw.referenceNumber || ''}`;
 
   return {
     bank_key: `${accountId}:${txId}`,
     account_id: accountId,
     amount: Math.abs(signedAmount),
     signed_amount: signedAmount,
-    currency: raw?.transaction_amount?.currency || 'EUR',
+    currency: amountObj.currency || 'EUR',
     type: isCredit ? 'income' : 'expense',
     date,
     merchant,
@@ -345,6 +433,31 @@ function classify(name, note, signedAmount) {
   return 'Other';
 }
 
+function isGenericAccountDescription(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return true;
+  const normalized = raw.toUpperCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const generic = new Set([
+    'CURRENT', 'CURRENT ACCOUNT', 'CHECKING', 'CHECKING ACCOUNT', 'CACC',
+    'SAVINGS', 'SAVINGS ACCOUNT', 'SVGS', 'DEPOSIT', 'BANK ACCOUNT',
+    'ARVELDUSKONTO', 'HOIUKONTO', 'KONTO'
+  ]);
+  return generic.has(normalized);
+}
+
+function accountAliasFromResource(account) {
+  if (!account || typeof account !== 'object') return '';
+  // Enable Banking documents `details` as the account description set by the PSU
+  // or provided by the ASPSP. Prefer that for the user's own bank-side nickname.
+  const details = String(account.details || '').trim();
+  if (details && !isGenericAccountDescription(details)) return details;
+  return '';
+}
+
+function accountTypeCode(account) {
+  return String(account?.cash_account_type || account?.cashAccountType || '').trim().toUpperCase();
+}
+
 async function bankCallback(url, env) {
   requireConfigured(env);
   const code = String(url.searchParams.get('code') || '');
@@ -358,6 +471,17 @@ async function bankCallback(url, env) {
     if (pending.phase !== 'pending' || !pending.install) throw httpError(401, 'Invalid bank authorization state');
 
     const session = await eb(env, '/sessions', { method: 'POST', body: { code } });
+    const accountAliases = {};
+    const accountTypes = {};
+    for (const account of session?.accounts || []) {
+      if (!account || typeof account !== 'object') continue;
+      const id = String(account.uid || account.account_id_internal || '').trim();
+      if (!id) continue;
+      const alias = accountAliasFromResource(account);
+      if (alias) accountAliases[id] = alias;
+      const typeCode = accountTypeCode(account);
+      if (typeCode) accountTypes[id] = typeCode;
+    }
     const validUntilMs = Date.parse(session?.access?.valid_until || '');
     const exp = Number.isFinite(validUntilMs)
       ? Math.floor(validUntilMs / 1000)
@@ -369,6 +493,8 @@ async function bankCallback(url, env) {
       install: pending.install,
       bank: session?.aspsp?.name || pending.bank || '',
       country: session?.aspsp?.country || pending.country || 'EE',
+      aliases: accountAliases,
+      account_types: accountTypes,
       exp
     });
 

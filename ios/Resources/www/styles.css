@@ -416,9 +416,21 @@ body.gated .app-shell,body.gated .bottom-nav{visibility:hidden;pointer-events:no
 .bank-privacy{display:flex;gap:9px;align-items:flex-start;margin:13px 0;padding:11px 12px;border-radius:14px;background:var(--surface-2);color:var(--muted);font-size:11px;line-height:1.45}
 .bank-privacy>span:first-child{color:var(--accent);font-weight:900}
 .bank-accounts{display:grid;gap:7px;margin:13px 0}
-.bank-account-row{display:flex;justify-content:space-between;gap:12px;padding:11px 12px;border-radius:13px;background:var(--surface-2);font-size:12px}
-.bank-account-row span{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.bank-account-row strong{white-space:nowrap}
+.bank-account-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 13px;border-radius:14px;background:var(--surface-2);font-size:12px;transition:box-shadow .24s ease,background .24s ease,transform .24s ease}
+.bank-account-copy{display:grid;gap:3px;min-width:0}
+.bank-account-name{font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bank-account-meta{font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bank-account-balance{font-size:13px;white-space:nowrap;flex:0 0 auto}
+[data-money-key]{font-variant-numeric:tabular-nums}
+.money-tween-up,.money-tween-down{display:inline-block;will-change:transform,text-shadow}
+.money-tween-up{animation:money-value-up .84s cubic-bezier(.2,.8,.2,1)}
+.money-tween-down{animation:money-value-down .84s cubic-bezier(.2,.8,.2,1)}
+.money-surface-up{animation:money-surface-up .86s ease}
+.money-surface-down{animation:money-surface-down .86s ease}
+@keyframes money-value-up{0%{transform:translateY(2px) scale(.985)}38%{transform:translateY(-1px) scale(1.035);text-shadow:0 0 20px color-mix(in srgb,var(--good) 42%,transparent)}100%{transform:none;text-shadow:none}}
+@keyframes money-value-down{0%{transform:translateY(-1px) scale(.985)}38%{transform:translateY(1px) scale(1.03);text-shadow:0 0 20px color-mix(in srgb,var(--bad) 40%,transparent)}100%{transform:none;text-shadow:none}}
+@keyframes money-surface-up{0%,100%{box-shadow:var(--shadow-soft)}36%{box-shadow:0 0 0 1px color-mix(in srgb,var(--good) 22%,transparent),0 10px 34px color-mix(in srgb,var(--good) 10%,transparent)}}
+@keyframes money-surface-down{0%,100%{box-shadow:var(--shadow-soft)}36%{box-shadow:0 0 0 1px color-mix(in srgb,var(--bad) 20%,transparent),0 10px 34px color-mix(in srgb,var(--bad) 9%,transparent)}}
 .bank-meta{display:grid;gap:4px;color:var(--muted);font-size:10px;margin:11px 0 14px}
 .bank-picker-state{display:flex;align-items:center;gap:12px;padding:24px 4px;color:var(--muted)}
 .spinner{width:20px;height:20px;border:2px solid var(--line-strong);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
@@ -427,3 +439,9 @@ body.gated .app-shell,body.gated .bottom-nav{visibility:hidden;pointer-events:no
 .bank-choice:active{transform:scale(.99);background:var(--surface-3)}
 .bank-choice-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @keyframes spin{to{transform:rotate(360deg)}}
+
+.bank-connect-error{display:grid;gap:7px;padding:16px;border-radius:16px;background:var(--bad-soft);border:1px solid color-mix(in srgb,var(--bad) 28%,var(--line));color:var(--bad);margin:10px 0 4px}.bank-connect-error strong{font-size:14px}.bank-connect-error span{font-size:12px;line-height:1.5;color:var(--text-soft)}.spinner.mini{width:18px;height:18px;border-width:2px;flex:0 0 18px}.bank-choice:disabled{opacity:.72;cursor:wait}
+.toggle-row input[type="checkbox"]{appearance:none;-webkit-appearance:none;width:48px;height:28px;border-radius:999px;background:var(--surface-3);border:1px solid var(--line-strong);position:relative;flex:0 0 48px;cursor:pointer;transition:.18s ease}
+.toggle-row input[type="checkbox"]::after{content:"";position:absolute;width:20px;height:20px;border-radius:50%;background:var(--muted);top:3px;left:4px;transition:.18s cubic-bezier(.2,.8,.2,1);box-shadow:0 2px 8px rgba(0,0,0,.24)}
+.toggle-row input[type="checkbox"]:checked{background:var(--accent-soft);border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
+.toggle-row input[type="checkbox"]:checked::after{left:23px;background:var(--accent)}

@@ -23,6 +23,8 @@
     <key>LSRequiresIPhoneOS</key><true/>
     <key>NSFaceIDUsageDescription</key><string>Use Face ID to protect and unlock your Nexora financial data.</string>
     <key>UIApplicationSupportsIndirectInputEvents</key><true/>
+    <key>UIBackgroundModes</key>
+    <array><string>fetch</string></array>
     <key>UISupportedInterfaceOrientations</key>
     <array><string>UIInterfaceOrientationPortrait</string></array>
     <key>UISupportedInterfaceOrientations~ipad</key>

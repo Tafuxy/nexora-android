@@ -1,5 +1,6 @@
 package com.nexora.app;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.KeyguardManager;
@@ -8,6 +9,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.hardware.biometrics.BiometricManager;
 import android.hardware.fingerprint.FingerprintManager;
@@ -37,6 +39,7 @@ public class MainActivity extends Activity {
     private static final String PREF_BIOMETRIC = "biometric_enabled";
     private static final String PREF_SETUP_COMPLETE = "setup_complete";
     private static final int REQUEST_DEVICE_CREDENTIAL = 4102;
+    private static final int REQUEST_NOTIFICATIONS = 4103;
 
     private WebView webView;
     private FrameLayout root;
@@ -54,6 +57,7 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
 
         prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        NotificationHelper.createChannels(this);
         configureSystemBars();
         setupContent();
         setupWebView();
@@ -362,6 +366,38 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public boolean isDeviceSecure() {
             return MainActivity.this.isDeviceSecure();
+        }
+
+        @JavascriptInterface
+        public void updateNotificationConfig(String json) {
+            BackgroundSyncJobService.saveConfig(MainActivity.this, json);
+        }
+
+        @JavascriptInterface
+        public void requestNotificationPermission() {
+            runOnUiThread(() -> {
+                NotificationHelper.createChannels(MainActivity.this);
+                if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                    requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQUEST_NOTIFICATIONS);
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public boolean openExternal(String url) {
+            try {
+                Uri uri = Uri.parse(url);
+                String scheme = uri.getScheme();
+                if (scheme == null || !(scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"))) {
+                    return false;
+                }
+                Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+                intent.addCategory(Intent.CATEGORY_BROWSABLE);
+                startActivity(intent);
+                return true;
+            } catch (Exception ignored) {
+                return false;
+            }
         }
 
         // Kept for compatibility with older bundled UI. Security cannot be disabled.

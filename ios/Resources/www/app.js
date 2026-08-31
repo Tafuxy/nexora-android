@@ -498,6 +498,7 @@ const bankCopy = {
     syncedAutomatically: 'Tehingud lisatakse automaatselt sinu Raha ülevaatesse.',
     manualEntry: 'Lisa käsitsi', cashOnly: 'Kasuta käsitsi sisestust sularaha või puuduva tehingu jaoks.',
     bankPrivacy: 'Pangaandmeid näidatakse ainult pärast sõrmejälje, näotuvastuse või telefoni lukukoodi kinnitamist.',
+    currentAccount: 'Arvelduskonto', savingsAccount: 'Säästukonto', bankAccount: 'Pangakonto', autoSync: 'Automaatne sünk',
     disconnectConfirm: 'Kas eemaldan pangaühenduse Nexorast? Imporditud tehingud jäävad alles.'
   },
   en: {
@@ -511,6 +512,7 @@ const bankCopy = {
     syncedAutomatically: 'Transactions are added automatically to your Money overview.',
     manualEntry: 'Add manually', cashOnly: 'Use manual entry for cash or a missing transaction.',
     bankPrivacy: 'Bank data is shown only after fingerprint, face unlock or device passcode authentication.',
+    currentAccount: 'Current account', savingsAccount: 'Savings account', bankAccount: 'Bank account', autoSync: 'Auto sync',
     disconnectConfirm: 'Disconnect the bank from Nexora? Imported transactions will remain.'
   }
 };
@@ -524,14 +526,14 @@ function o(key) {
 }
 
 const cleanDefaults = {
-  settings: { language: '', interests: [], requireAuth: true, biometricEnabled: false },
+  settings: { language: '', interests: [], requireAuth: true, biometricEnabled: false, notifications: { moneyReceived: true, moneySpent: true, bills: true, vehicles: true, budget: true, privacy: 'hideAmount' } },
   profile: { name: '', monthlyBudget: 0, monthlyIncome: 0, savingsGoal: 0, savingsCurrent: 0 },
   tasks: [],
   transactions: [],
   bills: [],
   vehicles: [],
-  bank: { installId: '', handle: '', connected: false, institutionId: '', accounts: [], lastSync: '', syncStatus: '' },
-  meta: { firstOpen: true, setupComplete: false, appVersion: '1.5.1' }
+  bank: { installId: '', handle: '', connected: false, institutionId: '', accounts: [], lastSync: '', syncStatus: '', syncWarning: '' },
+  meta: { firstOpen: true, setupComplete: false, appVersion: '1.7.0' }
 };
 
 const DEMO_TASKS = ['Review today’s priorities', 'Check upcoming car costs'];
@@ -546,6 +548,10 @@ let gateError = '';
 let setupDraft = {};
 const BANK_API_URL = String(window.NEXORA_CONFIG?.bankApiUrl || '').trim().replace(/\/$/, '');
 let bankBusy = false;
+let bankLastAttempt = 0;
+let bankAutoTimer = null;
+const renderedMoneyValues = new Map();
+const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
 
 function esc(s = '') {
   return String(s).replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
@@ -600,16 +606,75 @@ function sanitizeState(input) {
   s.settings.interests = Array.isArray(s.settings?.interests) ? s.settings.interests : [];
   s.settings.requireAuth = true;
   s.settings.biometricEnabled = Boolean(s.settings?.biometricEnabled);
+  s.settings.notifications = deepMerge(cleanDefaults.settings.notifications, s.settings?.notifications || {});
+  s.settings.notifications.moneyReceived = s.settings.notifications.moneyReceived !== false;
+  s.settings.notifications.moneySpent = s.settings.notifications.moneySpent !== false;
+  s.settings.notifications.bills = s.settings.notifications.bills !== false;
+  s.settings.notifications.vehicles = s.settings.notifications.vehicles !== false;
+  s.settings.notifications.budget = s.settings.notifications.budget !== false;
+  if (!['full','hideAmount','generic'].includes(s.settings.notifications.privacy)) s.settings.notifications.privacy = 'hideAmount';
   s.bank = deepMerge(cleanDefaults.bank, s.bank || {});
   s.bank.accounts = Array.isArray(s.bank.accounts) ? s.bank.accounts : [];
   s.bank.installId = String(s.bank.installId || '');
   if (!s.bank.installId) s.bank.installId = `install-${uid()}`;
-  s.meta = { ...(s.meta || {}), appVersion: '1.5.1', firstOpen: Boolean(s.meta?.firstOpen), setupComplete: Boolean(s.meta?.setupComplete) };
+  s.meta = { ...(s.meta || {}), appVersion: '1.7.0', firstOpen: Boolean(s.meta?.firstOpen), setupComplete: Boolean(s.meta?.setupComplete) };
   return s;
+}
+
+function notificationConfigPayload() {
+  const notifications = state.settings.notifications || cleanDefaults.settings.notifications;
+  const knownBankKeys = state.transactions.filter(tx => tx.source === 'bank' && tx.bankKey).map(tx => tx.bankKey).slice(-1500);
+  return {
+    language: lang(),
+    bankApiUrl: BANK_API_URL,
+    bank: {
+      installId: state.bank.installId || '',
+      handle: state.bank.handle || '',
+      connected: Boolean(state.bank.connected)
+    },
+    knownBankKeys,
+    notifications: {
+      moneyReceived: notifications.moneyReceived !== false,
+      moneySpent: notifications.moneySpent !== false,
+      bills: notifications.bills !== false,
+      vehicles: notifications.vehicles !== false,
+      budget: notifications.budget !== false,
+      privacy: notifications.privacy || 'hideAmount'
+    },
+    bills: state.bills.filter(b => b.active !== false).map(bill => ({
+      id: bill.id,
+      name: bill.name,
+      amount: Number(bill.amount || 0),
+      dueDay: Number(bill.dueDay || 1),
+      paidThisMonth: Boolean(billPaymentForMonth(bill))
+    })),
+    vehicles: state.vehicles.map(v => ({
+      id: v.id,
+      name: v.name,
+      odometer: Number(v.odometer || 0),
+      nextServiceKm: Number(v.nextServiceKm || 0),
+      insuranceDate: v.insuranceDate || '',
+      inspectionDate: v.inspectionDate || ''
+    })),
+    budget: {
+      limit: Number(state.profile.monthlyBudget || 0),
+      spent: Number(spentThisMonth() || 0)
+    }
+  };
+}
+
+function syncNativeNotificationConfig(requestPermission = false) {
+  if (!state.meta.setupComplete) return;
+  const payload = JSON.stringify(notificationConfigPayload());
+  try { window.NexoraNative?.updateNotificationConfig?.(payload); } catch (_) {}
+  if (requestPermission) {
+    try { window.NexoraNative?.requestNotificationPermission?.(); } catch (_) {}
+  }
 }
 
 function saveState(renderAfter = true) {
   localStorage.setItem('nexora-state', JSON.stringify(state));
+  syncNativeNotificationConfig(false);
   if (renderAfter) render();
 }
 
@@ -803,6 +868,7 @@ function finishSetup() {
 
   setupDraft = {};
   saveState(false);
+  syncNativeNotificationConfig(true);
   render();
 }
 
@@ -852,9 +918,14 @@ window.NexoraApp = {
     }
     saveState(false);
     renderGate();
-    if (state.meta.setupComplete && !nativeState.authPending && state.bank.handle && bankApiConfigured() && !bankBusy) {
-      const last = state.bank.lastSync ? new Date(state.bank.lastSync).getTime() : 0;
-      if (!last || Date.now() - last > 15 * 60 * 1000) setTimeout(() => syncBank(false), 250);
+    refreshBankAutoTimer();
+    if (state.meta.setupComplete && !nativeState.authPending) {
+      syncNativeNotificationConfig(false);
+      if (!localStorage.getItem('nexora-notification-permission-v1')) {
+        localStorage.setItem('nexora-notification-permission-v1', '1');
+        setTimeout(() => syncNativeNotificationConfig(true), 450);
+      }
+      if (state.bank.handle && bankApiConfigured()) setTimeout(() => requestAutoSync(8000), 250);
     }
   },
   onBankReturn(handle) {
@@ -863,6 +934,7 @@ window.NexoraApp = {
       state.bank.syncStatus = 'AUTHORIZED';
       saveState(false);
     }
+    bankLastAttempt = Date.now();
     syncBank(true);
   },
   onBiometricResult(result) {
@@ -900,6 +972,8 @@ function init() {
     currentView = btn.dataset.view;
     $$('.nav-item').forEach(x => x.classList.toggle('active', x === btn));
     render();
+    refreshBankAutoTimer();
+    if (currentView === 'money') setTimeout(() => requestAutoSync(15000), 120);
   }));
 
   $('#modalBackdrop').addEventListener('click', e => { if (e.target.id === 'modalBackdrop') closeModal(); });
@@ -907,6 +981,10 @@ function init() {
 
   render();
   renderGate();
+  refreshBankAutoTimer();
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) setTimeout(() => requestAutoSync(10000), 250);
+  });
 }
 
 function applyNavLabels() {
@@ -930,6 +1008,7 @@ function render() {
   $('#pageTitle').textContent = t(`pages.${currentView}`);
   $('#app').innerHTML = (views[currentView] || views.home)();
   bindView();
+  animateMoneyChanges();
   renderGate();
 }
 
@@ -1010,10 +1089,99 @@ function totalBankBalance() {
   return (state.bank.accounts || []).reduce((sum, account) => sum + (Number.isFinite(Number(account.balance)) ? Number(account.balance) : 0), 0);
 }
 
-function bankAccountLabel(account) {
-  const iban = String(account.iban || '');
+function bankAccountTypeLabel(account) {
+  const code = String(account?.account_type || '').trim().toUpperCase();
+  const raw = String(account?.name || '').trim();
+  const upper = raw.toUpperCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (['CACC','CURRENT','CHECKING','CURRENT ACCOUNT','CHECKING ACCOUNT'].includes(code) || ['CURRENT','CHECKING','CURRENT ACCOUNT','CHECKING ACCOUNT'].includes(upper)) return b('currentAccount');
+  if (['SVGS','SAVINGS','SAVINGS ACCOUNT','DEPOSIT'].includes(code) || ['SAVINGS','SAVINGS ACCOUNT','DEPOSIT'].includes(upper)) return b('savingsAccount');
+  return b('bankAccount');
+}
+
+function bankAccountDisplayName(account) {
+  // Exact nickname/description from the bank wins. Preserve its original casing.
+  const explicit = String(account?.display_name || '').trim();
+  if (explicit) return explicit;
+  const raw = String(account?.name || '').trim();
+  const upper = raw.toUpperCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const generic = ['BANK ACCOUNT','CURRENT','CHECKING','CURRENT ACCOUNT','CHECKING ACCOUNT','SAVINGS','SAVINGS ACCOUNT','DEPOSIT','CACC','SVGS'];
+  if (raw && !generic.includes(upper)) return raw;
+  return bankAccountTypeLabel(account);
+}
+
+function bankAccountMeta(account) {
+  const iban = String(account?.iban || '');
   const tail = iban ? `•••• ${iban.slice(-4)}` : '';
-  return [account.name || b('bankAccounts'), tail].filter(Boolean).join(' · ');
+  return [bankAccountTypeLabel(account), tail].filter(Boolean).join(' · ');
+}
+
+function animateMoneyChanges() {
+  const nodes = $$('[data-money-key][data-money-value]');
+  if (!nodes.length) return;
+  const reduce = Boolean(prefersReducedMotion?.matches);
+  for (const el of nodes) {
+    const key = String(el.dataset.moneyKey || '');
+    const next = Number(el.dataset.moneyValue);
+    if (!key || !Number.isFinite(next)) continue;
+    const previous = renderedMoneyValues.get(key);
+    renderedMoneyValues.set(key, next);
+    if (previous == null || !Number.isFinite(previous) || Math.abs(next - previous) < 0.005 || reduce) {
+      el.textContent = money(next);
+      continue;
+    }
+    tweenMoneyElement(el, previous, next);
+  }
+}
+
+function tweenMoneyElement(el, from, to) {
+  const delta = to - from;
+  const duration = Math.min(1050, 620 + Math.min(330, Math.abs(delta) * 4));
+  const started = performance.now();
+  el.classList.remove('money-tween-up', 'money-tween-down');
+  void el.offsetWidth;
+  el.classList.add(delta >= 0 ? 'money-tween-up' : 'money-tween-down');
+  const surface = el.closest('.bank-account-row, .finance-hero, .kpi, .plan-cell');
+  if (surface) {
+    surface.classList.remove('money-surface-up', 'money-surface-down');
+    void surface.offsetWidth;
+    surface.classList.add(delta >= 0 ? 'money-surface-up' : 'money-surface-down');
+    setTimeout(() => surface.classList.remove('money-surface-up', 'money-surface-down'), 900);
+  }
+  const frame = now => {
+    const p = Math.min(1, (now - started) / duration);
+    const eased = 1 - Math.pow(1 - p, 3);
+    el.textContent = money(from + delta * eased);
+    if (p < 1) requestAnimationFrame(frame);
+    else {
+      el.textContent = money(to);
+      setTimeout(() => el.classList.remove('money-tween-up', 'money-tween-down'), 180);
+    }
+  };
+  requestAnimationFrame(frame);
+}
+
+function shouldAutoSync(minAgeMs = 30000) {
+  if (!state.meta.setupComplete || nativeState.authPending || bankBusy || !state.bank.handle || !bankApiConfigured()) return false;
+  const now = Date.now();
+  if (now - bankLastAttempt < 8000) return false;
+  const last = state.bank.lastSync ? new Date(state.bank.lastSync).getTime() : 0;
+  return !last || now - last >= minAgeMs;
+}
+
+function requestAutoSync(minAgeMs = 30000) {
+  if (!shouldAutoSync(minAgeMs)) return;
+  bankLastAttempt = Date.now();
+  syncBank(false);
+}
+
+function refreshBankAutoTimer() {
+  if (bankAutoTimer) clearInterval(bankAutoTimer);
+  bankAutoTimer = null;
+  if (currentView === 'money' && state.bank.handle && bankApiConfigured() && !nativeState.authPending) {
+    bankAutoTimer = setInterval(() => {
+      if (!document.hidden) requestAutoSync(45000);
+    }, 60000);
+  }
 }
 
 function bankCardMarkup() {
@@ -1037,8 +1205,9 @@ function bankCardMarkup() {
 
   const accounts = state.bank.accounts || [];
   return `<section class="card bank-card ${state.bank.connected ? 'bank-connected' : ''}">
-    <div class="bank-card-head"><div><div class="label">${b('bankConnected')}</div><h3>${accounts.length ? money(totalBankBalance()) : b('bankPending')}</h3></div><span class="bank-shield">✓</span></div>
-    ${accounts.length ? `<div class="bank-accounts">${accounts.map(a => `<div class="bank-account-row"><span>${esc(bankAccountLabel(a))}</span><strong>${a.balance == null ? '—' : money(a.balance)}</strong></div>`).join('')}</div>` : `<p class="small muted">${b('bankPending')}</p>`}
+    <div class="bank-card-head"><div><div class="label">${b('bankConnected')}</div><h3 ${accounts.length ? `data-money-key="bank-total" data-money-value="${Number(totalBankBalance())}"` : ''}>${accounts.length ? money(totalBankBalance()) : b('bankPending')}</h3></div><span class="bank-shield">✓</span></div>
+    ${accounts.length ? `<div class="bank-accounts">${accounts.map(a => `<div class="bank-account-row"><div class="bank-account-copy"><strong class="bank-account-name">${esc(bankAccountDisplayName(a))}</strong><span class="bank-account-meta">${esc(bankAccountMeta(a))}</span></div><strong class="bank-account-balance" ${a.balance == null ? '' : `data-money-key="bank-account-${esc(a.id)}" data-money-value="${Number(a.balance)}"`}>${a.balance == null ? '—' : money(a.balance)}</strong></div>`).join('')}</div>` : `<p class="small muted">${b('bankPending')}</p>`}
+    ${state.bank.syncWarning ? `<div class="bank-connect-error"><strong>${lang()==='et'?'Tehingute sünk vajab tähelepanu':'Transaction sync needs attention'}</strong><span>${esc(state.bank.syncWarning)}</span></div>` : ''}
     <div class="bank-meta"><span>${b('lastSync')}: ${state.bank.lastSync ? new Intl.DateTimeFormat(locale(), {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}).format(new Date(state.bank.lastSync)) : '—'}</span><span>${b('syncedAutomatically')}</span></div>
     <div class="actions"><button class="primary" data-sync-bank ${bankBusy?'disabled':''}>${bankBusy ? b('bankSyncing') : b('syncNow')}</button><button class="secondary" data-disconnect-bank>${b('disconnectBank')}</button></div>
   </section>`;
@@ -1071,25 +1240,64 @@ async function openBankPicker() {
   }
 }
 
+function openExternalUrl(url) {
+  const target = String(url || '').trim();
+  if (!/^https:\/\//i.test(target)) return false;
+  try {
+    if (window.NexoraNative && typeof window.NexoraNative.openExternal === 'function') {
+      const result = window.NexoraNative.openExternal(target);
+      if (result !== false) return true;
+    }
+  } catch (_) {}
+  try {
+    window.location.assign(target);
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 async function connectBank(institutionId) {
   if (bankBusy) return;
   bankBusy = true;
+
+  const selectedButton = document.querySelector(`[data-bank-id="${CSS.escape(String(institutionId))}"]`);
+  const originalHtml = selectedButton?.innerHTML || '';
+  if (selectedButton) {
+    selectedButton.disabled = true;
+    selectedButton.innerHTML = `<span class="bank-choice-name">${esc(selectedButton.querySelector('.bank-choice-name')?.textContent || institutionId)}</span><span class="spinner mini"></span>`;
+  }
+
   try {
     const data = await apiJson('/api/connect', {
       method: 'POST',
       body: JSON.stringify({ institution_id: institutionId, install_id: state.bank.installId, language: lang().toUpperCase() })
     });
+
+    const authorizationUrl = String(data.authorization_url || '').trim();
+    if (!authorizationUrl) throw new Error('Panga autentimise linki ei saadud. Proovi uuesti.');
+
     state.bank.handle = data.bank_handle || '';
     state.bank.institutionId = institutionId;
     state.bank.syncStatus = data.requisition_status || '';
     saveState(false);
+
+    if (!openExternalUrl(authorizationUrl)) {
+      throw new Error('Panga sisselogimist ei õnnestunud avada. Kontrolli, et telefonis oleks veebibrauser lubatud.');
+    }
+
     closeModal();
-    if (data.authorization_url) window.location.assign(data.authorization_url);
   } catch (error) {
-    gateError = error.message || b('bankError');
-    closeModal();
-    render();
+    const message = error?.message || b('bankError');
+    gateError = message;
+    $('#modal').innerHTML = `<h2>${b('chooseBank')}</h2><div class="bank-connect-error"><strong>Ühendamine ebaõnnestus</strong><span>${esc(message)}</span></div><div class="modal-actions"><button type="button" class="secondary" data-bank-retry>Proovi uuesti</button><button type="button" class="ghost" data-close>${t('close')}</button></div>`;
+    $('[data-close]')?.addEventListener('click', closeModal);
+    $('[data-bank-retry]')?.addEventListener('click', openBankPicker);
   } finally {
+    if (selectedButton && document.body.contains(selectedButton)) {
+      selectedButton.disabled = false;
+      selectedButton.innerHTML = originalHtml;
+    }
     bankBusy = false;
   }
 }
@@ -1137,9 +1345,11 @@ async function syncBank(renderDuring = true) {
     state.bank.accounts = Array.isArray(data.accounts) ? data.accounts : [];
     state.bank.institutionId = data.institution_id || state.bank.institutionId || '';
     state.bank.lastSync = data.synced_at || state.bank.lastSync || '';
+    state.bank.syncWarning = Array.isArray(data.warnings) && data.warnings.length ? String(data.warnings[0]) : '';
     mergeBankTransactions(data.transactions || []);
     detectSalaryFromBank();
     saveState(false);
+    syncNativeNotificationConfig(false);
   } catch (error) {
     state.bank.syncStatus = 'error';
     gateError = error.message || b('bankError');
@@ -1168,6 +1378,7 @@ async function disconnectBank() {
   state.bank.accounts = [];
   state.bank.lastSync = '';
   state.bank.syncStatus = '';
+  state.bank.syncWarning = '';
   bankBusy = false;
   saveState();
 }
@@ -1187,6 +1398,60 @@ function homeQuickActions(firstVehicle) {
     if (type === 'bills') return `<button class="quick-action" data-go="bills"><span class="quick-action-icon">${icons.receipt}</span><span>${t('billsTitle')}</span></button>`;
     return `<button class="quick-action" ${firstVehicle ? `data-car-expense="${firstVehicle.id}"` : 'data-add="vehicle"'}><span class="quick-action-icon">${icons.wrench}</span><span>${firstVehicle ? t('carCost') : t('addCar')}</span></button>`;
   }).join('');
+}
+
+
+function notificationText(key) {
+  const et = {
+    title: 'Teavitused', configure: 'Seadista', status: 'Taustal aktiivne',
+    moneyReceived: 'Raha laekumine', moneySpent: 'Raha väljaminek', bills: 'Arvete tähtajad',
+    vehicles: 'Auto hooldus ja tähtajad', budget: 'Kululimiidi hoiatused', privacy: 'Lukuekraani privaatsus',
+    full: 'Näita summat ja detaile', hideAmount: 'Peida summa', generic: 'Ainult üldine teavitus',
+    hint: 'Nexora annab märku raha liikumisest ning lähenevatest arvetest ja auto tähtaegadest.',
+    save: 'Salvesta', permission: 'Luba teavitused', background: 'Pangasünki kontrollitakse taustal automaatselt.'
+  };
+  const en = {
+    title: 'Notifications', configure: 'Configure', status: 'Background active',
+    moneyReceived: 'Money received', moneySpent: 'Money spent', bills: 'Bill due dates',
+    vehicles: 'Vehicle service and deadlines', budget: 'Spending limit warnings', privacy: 'Lock screen privacy',
+    full: 'Show amount and details', hideAmount: 'Hide amount', generic: 'Generic notification only',
+    hint: 'Nexora can alert you about bank activity, upcoming bills and vehicle deadlines.',
+    save: 'Save', permission: 'Allow notifications', background: 'Bank activity is checked automatically in the background.'
+  };
+  return (lang() === 'et' ? et : en)[key] || key;
+}
+
+function openNotificationSettings() {
+  const n = state.settings.notifications || cleanDefaults.settings.notifications;
+  showModal(modalForm(notificationText('title'), `
+    <div class="card soft" style="padding:14px"><div class="small muted">${notificationText('hint')}</div></div>
+    <label class="toggle-row"><div><div class="row-title">${notificationText('moneyReceived')}</div></div><input type="checkbox" name="moneyReceived" ${n.moneyReceived!==false?'checked':''}></label>
+    <label class="toggle-row"><div><div class="row-title">${notificationText('moneySpent')}</div></div><input type="checkbox" name="moneySpent" ${n.moneySpent!==false?'checked':''}></label>
+    <label class="toggle-row"><div><div class="row-title">${notificationText('bills')}</div></div><input type="checkbox" name="bills" ${n.bills!==false?'checked':''}></label>
+    <label class="toggle-row"><div><div class="row-title">${notificationText('vehicles')}</div></div><input type="checkbox" name="vehicles" ${n.vehicles!==false?'checked':''}></label>
+    <label class="toggle-row"><div><div class="row-title">${notificationText('budget')}</div></div><input type="checkbox" name="budget" ${n.budget!==false?'checked':''}></label>
+    <div class="field"><label>${notificationText('privacy')}</label><select name="privacy">
+      <option value="full" ${n.privacy==='full'?'selected':''}>${notificationText('full')}</option>
+      <option value="hideAmount" ${n.privacy==='hideAmount'?'selected':''}>${notificationText('hideAmount')}</option>
+      <option value="generic" ${n.privacy==='generic'?'selected':''}>${notificationText('generic')}</option>
+    </select></div>
+    <div class="small muted">${notificationText('background')}</div>
+  `, notificationText('save')));
+  $('#modalForm').onsubmit = e => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    state.settings.notifications = {
+      moneyReceived: f.get('moneyReceived') === 'on',
+      moneySpent: f.get('moneySpent') === 'on',
+      bills: f.get('bills') === 'on',
+      vehicles: f.get('vehicles') === 'on',
+      budget: f.get('budget') === 'on',
+      privacy: String(f.get('privacy') || 'hideAmount')
+    };
+    closeModal();
+    saveState();
+    syncNativeNotificationConfig(true);
+  };
 }
 
 const views = {
@@ -1233,9 +1498,9 @@ const views = {
       ${state.meta.firstOpen ? `<section class="card soft"><div class="insight"><b>${t('firstOpenCard')}</b><span class="small muted">${t('firstOpenSub')}</span></div></section>` : ''}
       <section class="quick-actions" aria-label="Quick actions">${homeQuickActions(firstVehicle)}</section>
       <div class="grid-3">
-        <section class="card kpi good-card"><div class="label">${f('totalIncome')}</div><div class="value money-pos">${money(incomeThisMonth())}</div><div class="delta muted">${t('thisMonth')}</div></section>
-        <section class="card kpi"><div class="label">${f('totalExpenses')}</div><div class="value money-neg">${money(spentThisMonth())}</div><div class="delta muted">${t('thisMonth')}</div></section>
-        <section class="card kpi accent-card"><div class="label">${f('freeMoney')}</div><div class="value ${incomeThisMonth()-spentThisMonth()>=0?'money-pos':'money-neg'}">${money(incomeThisMonth()-spentThisMonth())}</div><div class="delta muted">${t('thisMonth')}</div></section>
+        <section class="card kpi good-card"><div class="label">${f('totalIncome')}</div><div class="value money-pos" data-money-key="home-income" data-money-value="${Number(incomeThisMonth())}">${money(incomeThisMonth())}</div><div class="delta muted">${t('thisMonth')}</div></section>
+        <section class="card kpi"><div class="label">${f('totalExpenses')}</div><div class="value money-neg" data-money-key="home-spend" data-money-value="${Number(spentThisMonth())}">${money(spentThisMonth())}</div><div class="delta muted">${t('thisMonth')}</div></section>
+        <section class="card kpi accent-card"><div class="label">${f('freeMoney')}</div><div class="value ${incomeThisMonth()-spentThisMonth()>=0?'money-pos':'money-neg'}" data-money-key="home-free" data-money-value="${Number(incomeThisMonth()-spentThisMonth())}">${money(incomeThisMonth()-spentThisMonth())}</div><div class="delta muted">${t('thisMonth')}</div></section>
       </div>
       <div class="section-title"><h3>${t('upNext')}</h3><button class="ghost" data-go="planner">${t('seeAll')}</button></div>
       <section class="card"><div class="list">${tasks.length ? tasks.map(taskRow).join('') : `<div class="empty">${t('noUrgent')}</div>`}</div></section>
@@ -1267,21 +1532,21 @@ const views = {
       <section class="card finance-hero ${statusBad ? 'finance-danger' : ''}">
         <div class="hero-kicker">${t('monthlyStatus')}</div>
         <div class="finance-balance-label">${t('availableMoney')}</div>
-        <div class="finance-balance ${f.cashLeft < 0 ? 'money-neg' : 'money-pos'}">${money(f.cashLeft)}</div>
+        <div class="finance-balance ${f.cashLeft < 0 ? 'money-neg' : 'money-pos'}" data-money-key="money-cash-left" data-money-value="${Number(f.cashLeft)}">${money(f.cashLeft)}</div>
         <div class="finance-status-line"><span class="dot ${statusBad ? 'bad' : 'good'}"></span><span>${statusBad ? t('needsAttention') : t('onTrack')}</span></div>
         <div class="finance-flow">
-          <div><span>${t('actualIncome')}</span><strong class="money-pos">${money(f.inc)}</strong></div>
-          <div><span>${t('actualExpenses')}</span><strong>${money(f.spend)}</strong></div>
+          <div><span>${t('actualIncome')}</span><strong class="money-pos" data-money-key="money-income" data-money-value="${Number(f.inc)}">${money(f.inc)}</strong></div>
+          <div><span>${t('actualExpenses')}</span><strong data-money-key="money-spend" data-money-value="${Number(f.spend)}">${money(f.spend)}</strong></div>
         </div>
       </section>
 
       <section class="card">
         <div class="section-title"><h3>${t('plannedVsActual')}</h3><button class="ghost" data-edit-profile>${t('edit')}</button></div>
         <div class="finance-plan-grid">
-          <div class="plan-cell"><span>${t('expectedIncome')}</span><strong>${money(f.expectedIncome)}</strong></div>
-          <div class="plan-cell"><span>${t('budget')}</span><strong>${money(f.limit)}</strong></div>
-          <div class="plan-cell"><span>${t('committedBills')}</span><strong>${money(monthlyBillsTotal())}</strong></div>
-          <div class="plan-cell"><span>${t('limitRemaining')}</span><strong class="${f.limitLeft !== null && f.limitLeft < 0 ? 'money-neg' : ''}">${f.limitLeft === null ? '—' : money(f.limitLeft)}</strong></div>
+          <div class="plan-cell"><span>${t('expectedIncome')}</span><strong data-money-key="plan-income" data-money-value="${Number(f.expectedIncome)}">${money(f.expectedIncome)}</strong></div>
+          <div class="plan-cell"><span>${t('budget')}</span><strong data-money-key="plan-limit" data-money-value="${Number(f.limit)}">${money(f.limit)}</strong></div>
+          <div class="plan-cell"><span>${t('committedBills')}</span><strong data-money-key="plan-bills" data-money-value="${Number(monthlyBillsTotal())}">${money(monthlyBillsTotal())}</strong></div>
+          <div class="plan-cell"><span>${t('limitRemaining')}</span><strong class="${f.limitLeft !== null && f.limitLeft < 0 ? 'money-neg' : ''}" ${f.limitLeft === null ? '' : `data-money-key="plan-limit-left" data-money-value="${Number(f.limitLeft)}"`}>${f.limitLeft === null ? '—' : money(f.limitLeft)}</strong></div>
         </div>
         ${f.limit ? `<div class="progress" style="margin-top:15px"><span style="width:${limitPct}%"></span></div>` : `<div class="small muted" style="margin-top:14px">${t('spendingLimitHelp')}</div>`}
       </section>
@@ -1349,7 +1614,7 @@ const views = {
       <section class="card brand-card">
         <img class="brand-wordmark dark-logo" src="nexora-wordmark-dark.png" alt="Nexora" />
         <img class="brand-wordmark light-logo" src="nexora-wordmark-light.png" alt="Nexora" />
-        <div class="brand-version">Nexora · 1.5.1</div>
+        <div class="brand-version">Nexora · 1.7.0</div>
       </section>
       <section class="card">
         <div class="section-title"><h3>${t('statistics')}</h3></div>
@@ -1374,6 +1639,11 @@ const views = {
         <div class="section-title"><h3>${t('appSettings')}</h3><button class="ghost" data-open-settings>${t('configure')}</button></div>
         <div class="statline"><span>${t('language')}</span><strong>${currentLangLabel}</strong></div>
         <div class="statline"><span>${t('themeLabel')}</span><strong>${themeLabel}</strong></div>
+      </section>
+      <section class="card">
+        <div class="section-title"><h3>${notificationText('title')}</h3><button class="ghost" data-open-notifications>${notificationText('configure')}</button></div>
+        <div class="statline"><span>${notificationText('moneyReceived')} / ${notificationText('moneySpent')}</span><strong>${(state.settings.notifications?.moneyReceived!==false || state.settings.notifications?.moneySpent!==false) ? 'ON' : 'OFF'}</strong></div>
+        <div class="statline"><span>${notificationText('bills')} / ${notificationText('vehicles')}</span><strong>${(state.settings.notifications?.bills!==false || state.settings.notifications?.vehicles!==false) ? 'ON' : 'OFF'}</strong></div>
       </section>
       <section class="card">
         <div class="section-title"><h3>${o('security')}</h3><span class="pill good">${o('alwaysOn')}</span></div>
@@ -1533,6 +1803,7 @@ function bindView() {
   $$('[data-edit-vehicle]').forEach(btn => btn.onclick = () => openVehicleUpdate(btn.dataset.editVehicle));
   $('[data-edit-profile]')?.addEventListener('click', openProfile);
   $('[data-open-settings]')?.addEventListener('click', openSettings);
+  $('[data-open-notifications]')?.addEventListener('click', openNotificationSettings);
   $('[data-export]')?.addEventListener('click', exportData);
   $('[data-reset]')?.addEventListener('click', resetData);
   $('[data-connect-bank]')?.addEventListener('click', openBankPicker);
@@ -1749,7 +2020,6 @@ function openProfile() {
     state.profile = {
       ...state.profile,
       name: String(f.get('name') || '').trim(),
-      monthlyIncome: Number(f.get('monthlyIncome') || 0),
       monthlyIncome: Number(f.get('monthlyIncome') || 0),
       monthlyBudget: Number(f.get('monthlyBudget') || 0),
       savingsGoal: Number(f.get('savingsGoal') || 0),

@@ -1,135 +1,55 @@
-# Nexora 1.6.0
+# Nexora 1.7.0
 
-Nexora combines Planner, Money, Bills and Garage in one mobile app, with optional bank sync through Enable Banking.
+Nexora combines Planner, Money, Bills and Garage with Enable Banking account sync, mandatory device authentication and native reminders.
+
+## What changed in 1.7.0
+
+- Bank account cards prefer the exact bank-provided account nickname/description (for example `PEAMINE-KONTO` or `Estland Development`) and show the account type separately.
+- Money values tween smoothly when balances, income or spending change.
+- Bank sync remains automatic after unlock, when opening Money and while Money is active.
+- Android background bank checks run periodically even when Nexora is not open and can notify about new incoming/outgoing transactions.
+- iOS uses Background Fetch for best-effort bank checks when the app is not open.
+- Native reminders for monthly bills, spending-limit thresholds, vehicle service mileage, insurance and inspection dates.
+- Notification settings allow incoming money, outgoing money, bills, vehicles and spending-limit alerts to be toggled independently.
+- Lock-screen privacy defaults to hiding bank amounts/details. Full details are opt-in in Nexora Settings.
+- `/privacy` and `/terms` remain available from the Cloudflare Worker.
+
+## Existing GitHub secrets
+
+Keep the same secrets you already configured:
+
+- `ENABLEBANKING_APP_ID`
+- `ENABLEBANKING_PRIVATE_KEY`
+- `NEXORA_SESSION_SECRET`
+- `CLOUDFLARE_ACCOUNT_ID`
+- `CLOUDFLARE_API_TOKEN`
+- `NEXORA_BANK_API_URL`
+
+No new API account or secret is required for 1.7.0.
+
+## Update order
+
+1. Replace the repository files with this package and push to `main`.
+2. Run **Deploy Nexora Bank Backend** once so the latest Worker/legal endpoints are deployed.
+3. Build **Nexora APK** and/or **Nexora iOS IPA**.
+4. Install the new build over the existing Nexora app.
+5. On first launch after updating, allow notifications when Android/iOS asks.
+
+## Notification behavior
+
+### Android
+
+Android uses the platform JobScheduler. The bank is checked in the background on an OS-managed schedule with a target interval of about 15 minutes. Android can delay jobs to save battery. Opening Nexora still triggers the normal immediate sync.
+
+### iOS
+
+iOS uses Background Fetch and local notifications. Apple decides when background refresh is allowed, so bank-activity notifications are best-effort and may not be immediate. Bill and dated vehicle reminders are scheduled locally and do not require Nexora to be open at the due time.
+
+For true real-time iOS banking push later, APNs server-side push can be added when Nexora has an Apple Developer production setup.
 
 ## Security
 
-After first-time setup, app authentication is mandatory and cannot be disabled from Nexora settings.
-
-- Android prefers fingerprint / face unlock and allows the device screen lock as fallback.
-- iOS uses Face ID / Touch ID with iPhone passcode fallback through LocalAuthentication.
-- The WebView is hidden immediately when the app leaves the foreground so personal and financial information is not left visible in the recent-apps snapshot.
-- Returning from bank authorization requires authentication again before the bank sync result is shown.
-- Android backups are disabled for the app.
-- Enable Banking and Cloudflare secrets are never embedded in APK or IPA builds.
-
-## Finance flow
-
-Money is centered around bank sync rather than manual entry:
-
-- Connect an Estonian bank through Enable Banking.
-- Import balances and transactions.
-- Automatically classify common transaction types such as salary, food, fuel, utilities, subscriptions, insurance and car costs.
-- Salary detected from a bank transaction can populate monthly income when the user has not set one yet.
-- Manual `Add expense/income` remains available for cash and missing transactions.
-- Bills remain available as a dedicated recurring-payments view.
-- Statistics show total income, spending, bills and car costs.
-
-## Enable Banking for individual use
-
-Enable Banking supports restricted Production applications linked to the developer's own bank accounts. This is suitable for individual non-commercial use and real-account evaluation without a company. A restricted application can only retrieve data from accounts linked to that application in the Enable Banking Control Panel. Supporting arbitrary public Nexora users later requires a production agreement with Enable Banking.
-
-## Bank backend
-
-`backend/` contains a Cloudflare Worker. It signs Enable Banking API requests server-side with the application's RSA private key and keeps the key outside the mobile builds.
-
-GitHub repository secrets:
-
-### Cloudflare
-- `CLOUDFLARE_API_TOKEN`
-- `CLOUDFLARE_ACCOUNT_ID`
-- `NEXORA_SESSION_SECRET`
-
-### Enable Banking
-- `ENABLEBANKING_APP_ID`
-- `ENABLEBANKING_PRIVATE_KEY`
-
-### Mobile builds
-- `NEXORA_BANK_API_URL`
-
-## Recommended setup order
-
-### 1. Deploy an empty bank Worker first
-
-Add these GitHub repository secrets:
-
-- `CLOUDFLARE_API_TOKEN`
-- `CLOUDFLARE_ACCOUNT_ID`
-- `NEXORA_SESSION_SECRET`
-
-Run **Deploy Nexora Bank Backend** in GitHub Actions. The workflow can deploy before Enable Banking credentials exist.
-
-Note the Worker base URL, for example:
-
-`https://nexora-bank.<your-subdomain>.workers.dev`
-
-The Enable Banking callback will be:
-
-`https://nexora-bank.<your-subdomain>.workers.dev/bank/callback`
-
-### 2. Create an Enable Banking account and Production API application
-
-Sign in to Enable Banking Control Panel with your email. Create a **Production** API application and add the Worker callback URL above as an allowed redirect URL.
-
-Let the browser generate the application's private key. Save the downloaded `.pem` file securely. The private key must not be committed to Git.
-
-### 3. Activate restricted mode with your own account
-
-In Enable Banking Control Panel choose **Activate by linking accounts** for the Production application and link your own bank account. The application becomes active in restricted mode.
-
-### 4. Add Enable Banking credentials to GitHub
-
-Add:
-
-- `ENABLEBANKING_APP_ID` — the application ID / `kid`
-- `ENABLEBANKING_PRIVATE_KEY` — paste the complete generated `-----BEGIN PRIVATE KEY----- ... -----END PRIVATE KEY-----` PEM content
-
-Re-run **Deploy Nexora Bank Backend**.
-
-Open:
-
-`https://nexora-bank.<your-subdomain>.workers.dev/health`
-
-It should return `"configured": true` and provider `"enable-banking"`.
-
-### 5. Configure Android / iOS builds
-
-Add GitHub secret:
-
-- `NEXORA_BANK_API_URL` = the Worker base URL without `/health` or `/bank/callback`
-
-Then run the Android or iOS build workflow.
-
-## Android
-
-Workflow: **Build Nexora APK**
-
-Artifact: `Nexora-APK` → `Nexora.apk`
-
-- package: `com.nexora.app`
-- version: `1.6.0`
-- version code: `11`
-
-## iOS
-
-Workflow: **Build Nexora iOS IPA**
-
-Artifact: `Nexora-iOS-IPA` → `Nexora-unsigned.ipa`
-
-The GitHub workflow builds an unsigned IPA. Apple requires the IPA to be signed before installation.
-
-- bundle id: `com.nexora.app`
-- version: `1.6.0`
-- build: `11`
-
-## Bank authorization flow
-
-1. Nexora fetches personal-account banks available in Estonia from Enable Banking.
-2. The user chooses a bank.
-3. The Worker starts Enable Banking authorization and Nexora opens the bank authorization page.
-4. Enable Banking redirects to the Worker callback with an authorization code.
-5. The Worker exchanges the code for an Enable Banking session and returns a signed session handle to Nexora through `nexora://bank-connected`.
-6. Nexora locks again and requires fingerprint / face / passcode authentication.
-7. Only after successful unlock does Nexora request balances and transactions from the Worker.
-
-No bank password is stored by Nexora.
+- Nexora still requires fingerprint/face/device credential every time protected app content is reopened.
+- iOS uses Face ID / Touch ID / passcode.
+- Bank details remain hidden in the recent-apps/app-switcher snapshot.
+- Bank API private keys stay only in Cloudflare/GitHub secrets, never inside the APK/IPA.
