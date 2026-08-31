@@ -11,7 +11,7 @@ android {
         minSdk 26
         targetSdk 35
         versionCode 4
-        versionName '1.0.1'
+        versionName '1.1.0'
     }
 
     buildTypes {
@@ -27,8 +27,8 @@ android {
     }
 }
 
+// Intentionally no AndroidX/Kotlin runtime dependencies.
+// Nexora's interface runs in the built-in Android WebView, so keeping this
+// wrapper dependency-free avoids Kotlin stdlib duplicate-class conflicts.
 dependencies {
-    implementation 'androidx.appcompat:appcompat:1.7.0'
-    implementation 'androidx.webkit:webkit:1.12.1'
-    implementation 'androidx.core:core-splashscreen:1.0.1'
 }

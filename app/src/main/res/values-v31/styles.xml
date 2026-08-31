@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Nexora.Splash" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">@color/nexora_bg</item>
+        <item name="android:navigationBarColor">@color/nexora_bg</item>
+        <item name="android:windowSplashScreenBackground">@color/nexora_bg</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/nexora_splash_logo</item>
+        <item name="android:windowSplashScreenAnimationDuration">350</item>
+    </style>
+</resources>

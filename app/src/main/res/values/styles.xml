@@ -1,20 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Nexora" parent="Theme.AppCompat.NoActionBar">
+    <style name="Theme.Nexora" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item>
         <item name="android:windowActionModeOverlay">true</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:statusBarColor">@color/nexora_bg</item>
         <item name="android:navigationBarColor">@color/nexora_bg</item>
         <item name="android:windowBackground">@color/nexora_bg</item>
-        <item name="colorPrimary">@color/nexora_accent</item>
-        <item name="colorAccent">@color/nexora_accent</item>
-        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:colorAccent">@color/nexora_accent</item>
+        <item name="android:windowNoTitle">true</item>
     </style>
 
-    <style name="Theme.Nexora.Splash" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">@color/nexora_bg</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo</item>
-        <item name="windowSplashScreenAnimationDuration">500</item>
-        <item name="postSplashScreenTheme">@style/Theme.Nexora</item>
+    <style name="Theme.Nexora.Splash" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">@color/nexora_bg</item>
+        <item name="android:navigationBarColor">@color/nexora_bg</item>
+        <item name="android:windowBackground">@drawable/splash_background</item>
     </style>
 </resources>

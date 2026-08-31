@@ -582,6 +582,11 @@ const views = {
     const p = state.profile;
     const initials = (p.name || 'N').trim().slice(0, 1).toUpperCase();
     return `<div class="stack">
+      <section class="card brand-card">
+        <img class="brand-wordmark dark-logo" src="nexora-wordmark-dark.png" alt="Nexora" />
+        <img class="brand-wordmark light-logo" src="nexora-wordmark-light.png" alt="Nexora" />
+        <div class="brand-version">Nexora · 1.1.0</div>
+      </section>
       <section class="card profile-hero">
         <div class="avatar">${esc(initials)}</div>
         <div>

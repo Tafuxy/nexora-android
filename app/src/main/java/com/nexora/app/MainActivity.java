@@ -1,36 +1,34 @@
 package com.nexora.app;
 
 import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowInsets;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.FrameLayout;
 
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.splashscreen.SplashScreen;
-import androidx.webkit.WebSettingsCompat;
-import androidx.webkit.WebViewFeature;
-
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends Activity {
     private WebView webView;
+    private FrameLayout root;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        SplashScreen splashScreen = SplashScreen.installSplashScreen(this);
-        final long launchStartedAt = System.currentTimeMillis();
-        splashScreen.setKeepOnScreenCondition(() -> System.currentTimeMillis() - launchStartedAt < 700);
-
+        setTheme(R.style.Theme_Nexora);
         super.onCreate(savedInstanceState);
 
         configureSystemBars();
+        setupContent();
         setupWebView();
 
         if (savedInstanceState != null) {
@@ -43,32 +41,54 @@ public class MainActivity extends AppCompatActivity {
     private void configureSystemBars() {
         getWindow().setStatusBarColor(Color.rgb(9, 11, 15));
         getWindow().setNavigationBarColor(Color.rgb(9, 11, 15));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            getWindow().getDecorView().setSystemUiVisibility(0);
+        }
+    }
+
+    private void setupContent() {
+        root = new FrameLayout(this);
+        root.setBackgroundColor(Color.rgb(9, 11, 15));
+        root.setLayoutParams(new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+        ));
+
+        root.setOnApplyWindowInsetsListener((view, insets) -> {
+            int top;
+            int bottom;
+            int left;
+            int right;
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars());
+                top = bars.top;
+                bottom = bars.bottom;
+                left = bars.left;
+                right = bars.right;
+            } else {
+                top = insets.getSystemWindowInsetTop();
+                bottom = insets.getSystemWindowInsetBottom();
+                left = insets.getSystemWindowInsetLeft();
+                right = insets.getSystemWindowInsetRight();
+            }
+
+            view.setPadding(left, top, right, bottom);
+            return insets;
+        });
+
+        setContentView(root);
     }
 
     @SuppressLint("SetJavaScriptEnabled")
     private void setupWebView() {
         webView = new WebView(this);
-        webView.setLayoutParams(new ViewGroup.LayoutParams(
+        webView.setLayoutParams(new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
         ));
         webView.setBackgroundColor(Color.rgb(9, 11, 15));
-
-        // Android 15+ can draw app content behind the system bars. Apply the
-        // real status/navigation-bar insets directly to the WebView so the
-        // Nexora UI never sits behind the clock, battery or gesture area.
-        webView.setOnApplyWindowInsetsListener((view, insets) -> {
-            view.setPadding(
-                    0,
-                    insets.getSystemWindowInsetTop(),
-                    0,
-                    insets.getSystemWindowInsetBottom()
-            );
-            return insets;
-        });
-        webView.requestApplyInsets();
-
-        setContentView(webView);
+        webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
 
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -88,16 +108,16 @@ public class MainActivity extends AppCompatActivity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             settings.setSafeBrowsingEnabled(true);
         }
-        if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
-            WebSettingsCompat.setForceDark(settings, WebSettingsCompat.FORCE_DARK_ON);
-        }
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
                 String scheme = uri.getScheme();
-                if (scheme != null && (scheme.equals("http") || scheme.equals("https") || scheme.equals("mailto") || scheme.equals("tel"))) {
+                if (scheme != null && (
+                        scheme.equals("http") || scheme.equals("https") ||
+                        scheme.equals("mailto") || scheme.equals("tel")
+                )) {
                     try {
                         startActivity(new Intent(Intent.ACTION_VIEW, uri));
                     } catch (ActivityNotFoundException ignored) {
@@ -108,6 +128,9 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         webView.setWebChromeClient(new WebChromeClient());
+
+        root.addView(webView);
+        root.requestApplyInsets();
     }
 
     @Override
@@ -130,6 +153,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         if (webView != null) {
+            root.removeView(webView);
             webView.destroy();
             webView = null;
         }

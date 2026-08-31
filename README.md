@@ -1,24 +1,22 @@
-# Nexora Android
+# Nexora Android 1.1.0
 
-Installable Android wrapper for the Nexora Planner + Money + Garage app.
+Public-ready Android build of Nexora.
 
-## Fastest way to get the APK
+## Included
+- Nexora branded launcher icon and splash screen
+- Nexora wordmark inside Settings
+- Estonian and English language selection
+- Empty first launch: no demo tasks, money or vehicles
+- Android system-bar inset handling so content stays below status/navigation bars
+- Local-only data storage inside Android WebView
+- Android backup disabled for local personal finance/garage data
+- No AndroidX/Kotlin runtime dependencies (prevents Kotlin duplicate-class build failures)
 
-1. Create a new GitHub repository.
-2. Upload **all files and folders from this project** to the repository root.
-3. Open the repository's **Actions** tab.
-4. Open **Build Nexora APK**.
-5. If the workflow did not already run after your push, choose **Run workflow**.
-6. When the run is green, open it and download the artifact named **Nexora-APK**.
-7. Unzip the artifact and install `Nexora.apk` on Android.
+## Build APK on GitHub
+1. Upload/replace the repository files with this package.
+2. Commit and push to `main`.
+3. GitHub → Actions → **Build Nexora APK** → **Run workflow**.
+4. Open the successful run and download **Nexora-APK** from Artifacts.
+5. Extract the ZIP and install `Nexora.apk`.
 
-Android may ask you to allow installation from your browser/files app the first time.
-
-## Notes
-
-- Package ID: `com.nexora.app`
-- Version: `0.1.0`
-- Minimum Android: Android 8.0 (API 26)
-- App data currently lives locally in the Android WebView/localStorage.
-- The current APK does not yet include Nexora cloud accounts/sync.
-- The GitHub Action builds a debug-signed APK, which is directly installable for testing.
+Version: 1.1.0 (versionCode 4)
