@@ -16,7 +16,6 @@ import android.webkit.WebViewClient;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.splashscreen.SplashScreen;
-import androidx.core.view.WindowCompat;
 import androidx.webkit.WebSettingsCompat;
 import androidx.webkit.WebViewFeature;
 
@@ -42,7 +41,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void configureSystemBars() {
-        WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
         getWindow().setStatusBarColor(Color.rgb(9, 11, 15));
         getWindow().setNavigationBarColor(Color.rgb(9, 11, 15));
     }
@@ -50,12 +48,26 @@ public class MainActivity extends AppCompatActivity {
     @SuppressLint("SetJavaScriptEnabled")
     private void setupWebView() {
         webView = new WebView(this);
-        webView.setFitsSystemWindows(true);
         webView.setLayoutParams(new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
         ));
         webView.setBackgroundColor(Color.rgb(9, 11, 15));
+
+        // Android 15+ can draw app content behind the system bars. Apply the
+        // real status/navigation-bar insets directly to the WebView so the
+        // Nexora UI never sits behind the clock, battery or gesture area.
+        webView.setOnApplyWindowInsetsListener((view, insets) -> {
+            view.setPadding(
+                    0,
+                    insets.getSystemWindowInsetTop(),
+                    0,
+                    insets.getSystemWindowInsetBottom()
+            );
+            return insets;
+        });
+        webView.requestApplyInsets();
+
         setContentView(webView);
 
         WebSettings settings = webView.getSettings();
