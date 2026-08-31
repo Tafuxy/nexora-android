@@ -10,7 +10,9 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div class="app-shell">
+  <div id="gate" class="gate hidden" aria-live="polite"></div>
+
+  <div class="app-shell" id="appShell">
     <header class="topbar">
       <div class="topbar-brand">
         <img class="brand-mark" src="nexora-mark.png" alt="" aria-hidden="true" />
@@ -29,7 +31,7 @@
       <button class="nav-item" data-view="planner"><span class="nav-icon" data-icon="calendar"></span><span>Planner</span></button>
       <button class="nav-item" data-view="money"><span class="nav-icon" data-icon="wallet"></span><span>Money</span></button>
       <button class="nav-item" data-view="garage"><span class="nav-icon" data-icon="car"></span><span>Garage</span></button>
-      <button class="nav-item" data-view="profile"><span class="nav-icon" data-icon="user"></span><span>Profile</span></button>
+      <button class="nav-item" data-view="profile"><span class="nav-icon" data-icon="settings"></span><span>Profile</span></button>
     </nav>
   </div>
 

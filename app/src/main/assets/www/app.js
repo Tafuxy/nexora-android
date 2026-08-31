@@ -16,7 +16,7 @@ const icons = {
   receipt:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>',
   wrench:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M14.7 6.3a4 4 0 0 0-5-5L12 3.6 9.6 6 7.3 3.7a4 4 0 0 0 5 5L5 16a2.1 2.1 0 1 0 3 3l7.3-7.3a4 4 0 0 0 5-5L18 9l-2.4-2.4 2.3-2.3a4 4 0 0 0-3.2 2z"/></svg>',
   check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 12 4 4L19 6"/></svg>',
-  settings:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3l1.2 2.7 2.9.4-2.1 2.1.5 2.9-2.5-1.4-2.5 1.4.5-2.9-2.1-2.1 2.9-.4L12 3Z"/><circle cx="12" cy="13" r="3"/></svg>'
+  settings:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21h-4v-.09A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3v-4h.09A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3h4v.09A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.15.35.38.68.7.94.3.25.7.39 1.1.4H21v4h-.09a1.7 1.7 0 0 0-1.51.66Z"/></svg>'
 };
 
 const translations = {
@@ -27,15 +27,18 @@ const translations = {
     dateShortOptions: { day: '2-digit', month: 'short' },
     emptyName: 'sõber',
     greetingMorning: 'hommikust',
-    greetingDay: 'tere',
+    greetingDay: 'päevast',
     greetingEvening: 'õhtust',
-    homeWelcome: 'Tere tulemast tagasi',
+    homeWelcome: 'Tere',
     budgetAvailable: 'Selle kuu eelarvest vaba',
     budgetOver: 'Üle kuu eelarve',
     spentOf: 'kulutatud',
     ofBudget: 'eelarvest',
     usedPercent: 'kasutatud',
     noBudgetTitle: 'Sea enda Nexora üles',
+    dayReadyTitle: 'Tänane päev',
+    dayReadyClear: 'Kõik on rahulik. Lisa uus ülesanne või kulu siis, kui seda vajad.',
+    dayReadyTasks: 'aktiivset ülesannet ootab sind',
     noBudgetText: 'Lisa eelarve, säästueesmärk ja esimene auto või ülesanne, et äpp hakkaks sulle päris ülevaadet näitama.',
     setupNow: 'Ava seaded',
     addTask: 'Lisa ülesanne',
@@ -50,7 +53,7 @@ const translations = {
     upNext: 'Järgmisena',
     seeAll: 'Vaata kõiki',
     noUrgent: 'Praegu pole midagi kiiret.',
-    smartInsights: 'Nutikad tähelepanekud',
+    smartInsights: 'Ülevaade',
     plannerTasks: 'Sinu ülesanded',
     openCount: 'aktiivset',
     noTasksYet: 'Ülesandeid pole veel.',
@@ -136,10 +139,10 @@ const translations = {
     serviceTagPrefix: 'Hooldus',
     inspectionTagPrefix: 'Ülevaatus',
     insuranceTagPrefix: 'Kindlustus',
-    firstOpenCard: 'Alusta puhtalt',
-    firstOpenSub: 'See public-ready versioon tuleb ilma demoandmeteta. Lisa ainult oma päris andmed.',
+    firstOpenCard: 'Alusta enda moodi',
+    firstOpenSub: 'Lisa oma päris andmed ja Nexora kohandub sinu päeva, raha ja auto järgi.',
     saveSettings: 'Salvesta seaded',
-    systemReady: 'Public-ready',
+    systemReady: 'Sinu ülevaade',
     noDataYet: 'Andmeid pole veel',
     themeLabel: 'Välimus',
     themeModeHint: 'Kasuta üleval paremal tumeda/heleda teema nuppu.',
@@ -155,15 +158,18 @@ const translations = {
     dateShortOptions: { day: '2-digit', month: 'short' },
     emptyName: 'there',
     greetingMorning: 'morning',
-    greetingDay: 'there',
+    greetingDay: 'afternoon',
     greetingEvening: 'evening',
-    homeWelcome: 'Welcome back',
+    homeWelcome: 'Good',
     budgetAvailable: 'Available in your monthly budget',
     budgetOver: 'Over your monthly budget',
     spentOf: 'spent',
     ofBudget: 'of budget',
     usedPercent: 'used',
     noBudgetTitle: 'Set up your Nexora',
+    dayReadyTitle: 'Today',
+    dayReadyClear: 'Everything is clear. Add a task or expense whenever you need it.',
+    dayReadyTasks: 'open tasks are waiting for you',
     noBudgetText: 'Add your budget, savings goal and your first vehicle or task so the app can start showing real insights.',
     setupNow: 'Open settings',
     addTask: 'New task',
@@ -178,7 +184,7 @@ const translations = {
     upNext: 'Up next',
     seeAll: 'See all',
     noUrgent: 'Nothing urgent right now.',
-    smartInsights: 'Smart insights',
+    smartInsights: 'Overview',
     plannerTasks: 'Your tasks',
     openCount: 'open',
     noTasksYet: 'No tasks yet.',
@@ -264,10 +270,10 @@ const translations = {
     serviceTagPrefix: 'Service',
     inspectionTagPrefix: 'Inspection',
     insuranceTagPrefix: 'Insurance',
-    firstOpenCard: 'Start clean',
-    firstOpenSub: 'This public-ready version opens without demo data. Add only your real information.',
+    firstOpenCard: 'Make it yours',
+    firstOpenSub: 'Add your real information and Nexora will adapt around your day, money and car.',
     saveSettings: 'Save settings',
-    systemReady: 'Public-ready',
+    systemReady: 'Sinu ülevaade',
     noDataYet: 'No data yet',
     themeLabel: 'Appearance',
     themeModeHint: 'Use the dark/light toggle in the top right.',
@@ -278,13 +284,143 @@ const translations = {
   }
 };
 
+
+const onboardingCopy = {
+  et: {
+    welcomeTitle: 'Sinu päev, raha ja auto ühes kohas.',
+    welcomeText: 'Logi Google kontoga sisse ja Nexora seab end mõne sammuga sinu järgi paika.',
+    google: 'Jätka Google kontoga',
+    privacy: 'Nexora kasutab sisselogimiseks ainult sinu nime, e-posti ja profiilipilti.',
+    unlockTitle: 'Tere tulemast tagasi',
+    unlockText: 'Kinnita oma Google konto, et Nexora avada.',
+    signInError: 'Google sisselogimine ei õnnestunud. Proovi uuesti.',
+    signInConfig: 'Google sisselogimine pole hetkel saadaval. Proovi veidi hiljem uuesti.',
+    step: 'Samm',
+    of: '/',
+    back: 'Tagasi',
+    next: 'Edasi',
+    finish: 'Ava Nexora',
+    skip: 'Jäta praegu vahele',
+    setup1Title: 'Pane Nexora enda järgi paika',
+    setup1Text: 'Vali keel ja välimus. Neid saab hiljem seadetes alati muuta.',
+    language: 'Keel',
+    estonian: 'Eesti',
+    english: 'English',
+    appearance: 'Välimus',
+    systemTheme: 'Seadme järgi',
+    darkTheme: 'Tume',
+    lightTheme: 'Hele',
+    setup2Title: 'Sinu raha ülevaade',
+    setup2Text: 'Lisa ainult see, mida soovid jälgida. Kõik väljad on valikulised.',
+    monthlyBudget: 'Kuu eelarve',
+    currentSavings: 'Praegu säästetud',
+    savingsGoal: 'Säästueesmärk',
+    setup3Title: 'Lisa oma auto',
+    setup3Text: 'Nii saad jälgida hooldust, läbisõitu, kindlustust ja autokulusid.',
+    vehicleName: 'Mark ja mudel',
+    plate: 'Reg nr',
+    odometer: 'Läbisõit',
+    nextService: 'Järgmine hooldus (km)',
+    insuranceDate: 'Kindlustuse lõpp',
+    inspectionDate: 'Ülevaatus',
+    setup4Title: 'Mida Nexora sinu jaoks jälgib?',
+    setup4Text: 'Vali olulisemad teemad ja pane kiire avamine paika.',
+    personal: 'Isiklikud ülesanded',
+    work: 'Töö',
+    money: 'Raha ja eelarve',
+    garage: 'Auto ja hooldus',
+    bills: 'Arved ja tähtajad',
+    biometric: 'Kasuta sõrmejälge või näotuvastust',
+    biometricHint: 'Nexora avaneb järgmisel korral kiirelt sinu telefoni biomeetriaga.',
+    requireAuth: 'Küsi avamisel kinnitust',
+    requireAuthHint: 'Kui biomeetria pole kasutusel, küsib Nexora Google kontoga kinnitamist.',
+    account: 'Konto',
+    security: 'Turvalisus',
+    signedInWithGoogle: 'Google kontoga sisse logitud',
+    signOut: 'Logi välja',
+    enable: 'Lülita sisse',
+    disable: 'Lülita välja',
+    on: 'Sees',
+    off: 'Väljas',
+    biometricUnavailable: 'Selles telefonis pole biomeetriline avamine seadistatud.',
+    biometricCancelled: 'Biomeetrilist avamist ei muudetud.',
+    setupDone: 'Kõik on valmis'
+  },
+  en: {
+    welcomeTitle: 'Your day, money and car in one place.',
+    welcomeText: 'Sign in with Google and Nexora will tailor itself to you in a few quick steps.',
+    google: 'Continue with Google',
+    privacy: 'Nexora only uses your name, email and profile picture for sign-in.',
+    unlockTitle: 'Welcome back',
+    unlockText: 'Confirm your Google Account to unlock Nexora.',
+    signInError: 'Google sign-in didn’t complete. Try again.',
+    signInConfig: 'Google sign-in is temporarily unavailable. Please try again later.',
+    step: 'Step',
+    of: '/',
+    back: 'Back',
+    next: 'Next',
+    finish: 'Open Nexora',
+    skip: 'Skip for now',
+    setup1Title: 'Make Nexora yours',
+    setup1Text: 'Choose your language and appearance. You can change these later in Settings.',
+    language: 'Language',
+    estonian: 'Estonian',
+    english: 'English',
+    appearance: 'Appearance',
+    systemTheme: 'Follow device',
+    darkTheme: 'Dark',
+    lightTheme: 'Light',
+    setup2Title: 'Your money overview',
+    setup2Text: 'Add only what you want to track. Every field is optional.',
+    monthlyBudget: 'Monthly budget',
+    currentSavings: 'Current savings',
+    savingsGoal: 'Savings goal',
+    setup3Title: 'Add your car',
+    setup3Text: 'Track maintenance, mileage, insurance and real car costs.',
+    vehicleName: 'Make and model',
+    plate: 'Plate',
+    odometer: 'Odometer',
+    nextService: 'Next service (km)',
+    insuranceDate: 'Insurance renewal',
+    inspectionDate: 'Inspection',
+    setup4Title: 'What should Nexora focus on?',
+    setup4Text: 'Pick what matters most and set up quick, secure access.',
+    personal: 'Personal tasks',
+    work: 'Work',
+    money: 'Money and budget',
+    garage: 'Car and maintenance',
+    bills: 'Bills and deadlines',
+    biometric: 'Use fingerprint or face unlock',
+    biometricHint: 'Next time, Nexora can unlock quickly using your phone’s biometrics.',
+    requireAuth: 'Require verification on open',
+    requireAuthHint: 'If biometrics are off, Nexora asks you to confirm with Google.',
+    account: 'Account',
+    security: 'Security',
+    signedInWithGoogle: 'Signed in with Google',
+    signOut: 'Sign out',
+    enable: 'Enable',
+    disable: 'Disable',
+    on: 'On',
+    off: 'Off',
+    biometricUnavailable: 'Biometric unlock is not set up on this phone.',
+    biometricCancelled: 'Biometric unlock was not changed.',
+    setupDone: 'You’re all set'
+  }
+};
+
+function o(key) {
+  const bundle = onboardingCopy[lang()] || onboardingCopy.en;
+  return bundle[key] ?? key;
+}
+
 const cleanDefaults = {
-  settings: { language: '' },
+  account: null,
+  settings: { language: '', interests: [], requireAuth: true, biometricEnabled: false },
   profile: { name: '', monthlyBudget: 0, savingsGoal: 0, savingsCurrent: 0 },
   tasks: [],
   transactions: [],
   vehicles: [],
-  meta: { firstOpen: true, appVersion: '1.0.0' }
+  meta: { firstOpen: true, setupComplete: false, appVersion: '1.2.0' }
 };
 
 const DEMO_TASKS = ['Review today’s priorities', 'Check upcoming car costs'];
@@ -293,6 +429,10 @@ const DEMO_VEHICLE = 'My car';
 
 let state = loadState();
 let currentView = 'home';
+let nativeState = { launchAuthMode: window.NexoraNative ? 'google_required' : 'none', biometricAvailable: false, biometricEnabled: false, requireAuth: true, googleConfigured: false };
+let setupStep = 1;
+let gateError = '';
+let setupDraft = {};
 
 function esc(s = '') {
   return String(s).replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
@@ -342,7 +482,11 @@ function sanitizeState(input) {
   s.tasks = Array.isArray(s.tasks) ? s.tasks : [];
   s.transactions = Array.isArray(s.transactions) ? s.transactions : [];
   s.vehicles = Array.isArray(s.vehicles) ? s.vehicles : [];
-  s.meta = { ...(s.meta || {}), appVersion: '1.0.0', firstOpen: Boolean(s.meta?.firstOpen) };
+  s.settings.interests = Array.isArray(s.settings?.interests) ? s.settings.interests : [];
+  s.settings.requireAuth = s.settings?.requireAuth !== false;
+  s.settings.biometricEnabled = Boolean(s.settings?.biometricEnabled);
+  s.account = s.account && typeof s.account === 'object' ? s.account : null;
+  s.meta = { ...(s.meta || {}), appVersion: '1.2.0', firstOpen: Boolean(s.meta?.firstOpen), setupComplete: Boolean(s.meta?.setupComplete) };
   return s;
 }
 
@@ -390,6 +534,285 @@ function greeting() {
   return t('greetingEvening');
 }
 
+
+function gateNeeded() {
+  if (!state.account) return 'signin';
+  if (nativeState.launchAuthMode === 'google_required') return 'unlock';
+  if (!state.meta.setupComplete) return 'setup';
+  return '';
+}
+
+function accountAvatar(account = state.account) {
+  if (!account) return '<div class="account-photo-fallback">N</div>';
+  const initial = esc((account.name || account.email || 'N').trim().slice(0,1).toUpperCase());
+  return account.photo
+    ? `<img class="account-photo" src="${esc(account.photo)}" alt="" referrerpolicy="no-referrer">`
+    : `<div class="account-photo-fallback">${initial}</div>`;
+}
+
+function accountChip(account = state.account) {
+  if (!account) return '';
+  return `<div class="account-chip">${accountAvatar(account)}<div class="row-main"><div class="row-title">${esc(account.name || 'Google')}</div><div class="account-email">${esc(account.email || '')}</div></div></div>`;
+}
+
+function googleButton() {
+  return `<button class="google-btn" data-google-signin><span class="google-g">G</span><span>${o('google')}</span></button>`;
+}
+
+function renderGate() {
+  const gate = $('#gate');
+  const mode = gateNeeded();
+  if (!mode) {
+    document.body.classList.remove('gated');
+    gate.classList.add('hidden');
+    gate.innerHTML = '';
+    return;
+  }
+
+  document.body.classList.add('gated');
+  gate.classList.remove('hidden');
+
+  if (mode === 'signin') {
+    gate.innerHTML = `<div class="gate-shell">
+      <img class="gate-logo" src="nexora-mark.png" alt="Nexora">
+      <div class="gate-copy"><h1>${o('welcomeTitle')}</h1><p>${o('welcomeText')}</p></div>
+      ${gateError ? `<div class="gate-error">${esc(gateError)}</div>` : ''}
+      ${googleButton()}
+      <div class="gate-note">${o('privacy')}</div>
+    </div>`;
+  } else if (mode === 'unlock') {
+    gate.innerHTML = `<div class="gate-shell">
+      <img class="gate-wordmark dark-logo" src="nexora-wordmark-dark.png" alt="Nexora">
+      <img class="gate-wordmark light-logo" src="nexora-wordmark-light.png" alt="Nexora">
+      <div class="gate-copy"><h1>${o('unlockTitle')}</h1><p>${o('unlockText')}</p></div>
+      ${accountChip()}
+      ${gateError ? `<div class="gate-error">${esc(gateError)}</div>` : ''}
+      ${googleButton()}
+    </div>`;
+  } else {
+    gate.innerHTML = setupMarkup();
+  }
+
+  bindGate();
+}
+
+function setupMarkup() {
+  const progress = Math.max(1, Math.min(4, setupStep)) * 25;
+  const account = state.account || {};
+  const langValue = setupDraft.language || state.settings.language || lang();
+  const themeValue = setupDraft.theme || localStorage.getItem('nexora-theme') || 'system';
+  const interests = setupDraft.interests || state.settings.interests || [];
+  const hasInterest = key => interests.includes(key);
+
+  let body = '';
+  if (setupStep === 1) {
+    body = `<div class="setup-card">
+      <h2>${o('setup1Title')}</h2><p>${o('setup1Text')}</p>
+      ${accountChip(account)}
+      <div class="field"><label>${o('language')}</label><select id="setupLanguage"><option value="et" ${langValue==='et'?'selected':''}>${o('estonian')}</option><option value="en" ${langValue==='en'?'selected':''}>${o('english')}</option></select></div>
+      <div class="field"><label>${o('appearance')}</label><div class="choice-grid">
+        <button type="button" class="choice ${themeValue==='system'?'active':''}" data-theme-choice="system"><b>${o('systemTheme')}</b><span>Android</span></button>
+        <button type="button" class="choice ${themeValue==='dark'?'active':''}" data-theme-choice="dark"><b>${o('darkTheme')}</b><span>●</span></button>
+        <button type="button" class="choice ${themeValue==='light'?'active':''}" data-theme-choice="light"><b>${o('lightTheme')}</b><span>○</span></button>
+      </div></div>
+    </div>`;
+  } else if (setupStep === 2) {
+    body = `<div class="setup-card">
+      <h2>${o('setup2Title')}</h2><p>${o('setup2Text')}</p>
+      <div class="field"><label>${o('monthlyBudget')}</label><input id="setupBudget" type="number" inputmode="decimal" min="0" step="0.01" value="${esc((setupDraft.monthlyBudget ?? state.profile.monthlyBudget) || '')}" placeholder="0"></div>
+      <div class="grid-2"><div class="field"><label>${o('currentSavings')}</label><input id="setupSavingsCurrent" type="number" inputmode="decimal" min="0" step="0.01" value="${esc((setupDraft.savingsCurrent ?? state.profile.savingsCurrent) || '')}" placeholder="0"></div><div class="field"><label>${o('savingsGoal')}</label><input id="setupSavingsGoal" type="number" inputmode="decimal" min="0" step="0.01" value="${esc((setupDraft.savingsGoal ?? state.profile.savingsGoal) || '')}" placeholder="0"></div></div>
+    </div>`;
+  } else if (setupStep === 3) {
+    const existing = state.vehicles[0] || {};
+    body = `<div class="setup-card">
+      <h2>${o('setup3Title')}</h2><p>${o('setup3Text')}</p>
+      <div class="field"><label>${o('vehicleName')}</label><input id="setupVehicleName" value="${esc(setupDraft.vehicleName ?? existing.name ?? '')}" placeholder="BMW 520d Touring"></div>
+      <div class="grid-2"><div class="field"><label>${o('plate')}</label><input id="setupPlate" value="${esc(setupDraft.plate ?? existing.plate ?? '')}" placeholder="123 ABC"></div><div class="field"><label>${o('odometer')}</label><input id="setupOdometer" type="number" inputmode="numeric" min="0" value="${esc(setupDraft.odometer ?? existing.odometer ?? '')}" placeholder="0"></div></div>
+      <div class="field"><label>${o('nextService')}</label><input id="setupService" type="number" inputmode="numeric" min="0" value="${esc(setupDraft.nextServiceKm ?? existing.nextServiceKm ?? '')}" placeholder="0"></div>
+      <div class="grid-2"><div class="field"><label>${o('insuranceDate')}</label><input id="setupInsurance" type="date" value="${esc(setupDraft.insuranceDate ?? existing.insuranceDate ?? '')}"></div><div class="field"><label>${o('inspectionDate')}</label><input id="setupInspection" type="date" value="${esc(setupDraft.inspectionDate ?? existing.inspectionDate ?? '')}"></div></div>
+      <button class="setup-skip" type="button" data-skip-car>${o('skip')}</button>
+    </div>`;
+  } else {
+    body = `<div class="setup-card">
+      <h2>${o('setup4Title')}</h2><p>${o('setup4Text')}</p>
+      <div class="interest-grid">
+        <button type="button" class="interest ${hasInterest('personal')?'active':''}" data-interest="personal">${o('personal')}</button>
+        <button type="button" class="interest ${hasInterest('work')?'active':''}" data-interest="work">${o('work')}</button>
+        <button type="button" class="interest ${hasInterest('money')?'active':''}" data-interest="money">${o('money')}</button>
+        <button type="button" class="interest ${hasInterest('garage')?'active':''}" data-interest="garage">${o('garage')}</button>
+        <button type="button" class="interest ${hasInterest('bills')?'active':''}" data-interest="bills">${o('bills')}</button>
+      </div>
+      <label class="security-option"><input type="checkbox" id="setupRequireAuth" ${state.settings.requireAuth!==false?'checked':''}><span><b>${o('requireAuth')}</b><span>${o('requireAuthHint')}</span></span></label>
+      ${nativeState.biometricAvailable ? `<label class="security-option"><input type="checkbox" id="setupBiometric" ${state.settings.biometricEnabled?'checked':''}><span><b>${o('biometric')}</b><span>${o('biometricHint')}</span></span></label>` : ''}
+    </div>`;
+  }
+
+  return `<div class="gate-shell setup-shell">
+    <div class="setup-head"><img class="gate-logo" src="nexora-mark.png" alt="Nexora"><div class="row-main"><div class="setup-step-label">${o('step')} ${setupStep} ${o('of')} 4</div><div class="setup-progress"><span style="width:${progress}%"></span></div></div></div>
+    ${body}
+    <div class="setup-actions ${setupStep===1?'single':''}">
+      ${setupStep>1?`<button class="secondary" type="button" data-setup-back>${o('back')}</button>`:''}
+      <button class="primary" type="button" data-setup-next>${setupStep===4?o('finish'):o('next')}</button>
+    </div>
+  </div>`;
+}
+
+function saveCurrentSetupStep() {
+  if (setupStep === 1) {
+    setupDraft.language = $('#setupLanguage')?.value || lang();
+  } else if (setupStep === 2) {
+    setupDraft.monthlyBudget = Number($('#setupBudget')?.value || 0);
+    setupDraft.savingsCurrent = Number($('#setupSavingsCurrent')?.value || 0);
+    setupDraft.savingsGoal = Number($('#setupSavingsGoal')?.value || 0);
+  } else if (setupStep === 3) {
+    setupDraft.vehicleName = String($('#setupVehicleName')?.value || '').trim();
+    setupDraft.plate = String($('#setupPlate')?.value || '').trim();
+    setupDraft.odometer = Number($('#setupOdometer')?.value || 0);
+    setupDraft.nextServiceKm = Number($('#setupService')?.value || 0);
+    setupDraft.insuranceDate = String($('#setupInsurance')?.value || '');
+    setupDraft.inspectionDate = String($('#setupInspection')?.value || '');
+  } else {
+    setupDraft.requireAuth = $('#setupRequireAuth')?.checked !== false;
+    setupDraft.biometric = Boolean($('#setupBiometric')?.checked);
+  }
+}
+
+function finishSetup() {
+  saveCurrentSetupStep();
+  state.settings.language = setupDraft.language || state.settings.language || lang();
+  state.settings.interests = setupDraft.interests || [];
+  state.settings.requireAuth = setupDraft.requireAuth !== false;
+  state.profile.name = state.profile.name || state.account?.name || '';
+  state.profile.monthlyBudget = Number(setupDraft.monthlyBudget || 0);
+  state.profile.savingsCurrent = Number(setupDraft.savingsCurrent || 0);
+  state.profile.savingsGoal = Number(setupDraft.savingsGoal || 0);
+
+  if (setupDraft.vehicleName) {
+    const vehicle = {
+      id: state.vehicles[0]?.id || uid(),
+      name: setupDraft.vehicleName,
+      plate: setupDraft.plate || '',
+      odometer: Number(setupDraft.odometer || 0),
+      nextServiceKm: Number(setupDraft.nextServiceKm || 0),
+      insuranceDate: setupDraft.insuranceDate || state.vehicles[0]?.insuranceDate || '',
+      inspectionDate: setupDraft.inspectionDate || state.vehicles[0]?.inspectionDate || ''
+    };
+    if (state.vehicles.length) state.vehicles[0] = {...state.vehicles[0], ...vehicle}; else state.vehicles.push(vehicle);
+  }
+
+  state.meta.setupComplete = true;
+  state.meta.firstOpen = false;
+  if (setupDraft.theme === 'dark' || setupDraft.theme === 'light') {
+    localStorage.setItem('nexora-theme', setupDraft.theme);
+    document.documentElement.classList.toggle('light', setupDraft.theme === 'light');
+  } else if (setupDraft.theme === 'system') {
+    localStorage.removeItem('nexora-theme');
+    document.documentElement.classList.toggle('light', window.matchMedia?.('(prefers-color-scheme: light)').matches || false);
+  }
+
+  try { window.NexoraNative?.setRequireAuth(state.settings.requireAuth); } catch {}
+  if (setupDraft.biometric && nativeState.biometricAvailable) {
+    try { window.NexoraNative?.enableBiometric(); } catch {}
+  } else if (!setupDraft.biometric) {
+    state.settings.biometricEnabled = false;
+    try { window.NexoraNative?.disableBiometric(); } catch {}
+  }
+
+  setupDraft = {};
+  saveState(false);
+  render();
+}
+
+function bindGate() {
+  $('[data-google-signin]')?.addEventListener('click', () => {
+    gateError = '';
+    try { window.NexoraNative?.startGoogleSignIn(); }
+    catch { gateError = o('signInError'); renderGate(); }
+  });
+  $$('[data-theme-choice]').forEach(btn => btn.addEventListener('click', () => {
+    setupDraft.theme = btn.dataset.themeChoice;
+    renderGate();
+  }));
+  $$('[data-interest]').forEach(btn => btn.addEventListener('click', () => {
+    const current = new Set(setupDraft.interests || state.settings.interests || []);
+    current.has(btn.dataset.interest) ? current.delete(btn.dataset.interest) : current.add(btn.dataset.interest);
+    setupDraft.interests = [...current];
+    renderGate();
+  }));
+  $('[data-skip-car]')?.addEventListener('click', () => {
+    setupDraft.vehicleName = '';
+    setupStep = 4;
+    renderGate();
+  });
+  $('[data-setup-back]')?.addEventListener('click', () => {
+    saveCurrentSetupStep();
+    setupStep = Math.max(1, setupStep - 1);
+    renderGate();
+  });
+  $('[data-setup-next]')?.addEventListener('click', () => {
+    saveCurrentSetupStep();
+    if (setupStep === 1) {
+      state.settings.language = setupDraft.language || lang();
+      saveState(false);
+    }
+    if (setupStep < 4) {
+      setupStep += 1;
+      renderGate();
+    } else {
+      finishSetup();
+    }
+  });
+}
+
+window.NexoraApp = {
+  onNativeState(next) {
+    nativeState = {...nativeState, ...(next || {})};
+    state.settings.biometricEnabled = Boolean(nativeState.biometricEnabled);
+    state.settings.requireAuth = nativeState.requireAuth !== false;
+    saveState(false);
+    renderGate();
+  },
+  onGoogleAccount(account) {
+    if (!account?.email) return;
+    const previousEmail = state.account?.email || state.meta?.lastAccountEmail || '';
+    state.account = {...account};
+    state.meta.lastAccountEmail = account.email;
+    if (!state.profile.name) state.profile.name = account.name || '';
+    if (previousEmail && previousEmail !== account.email) {
+      state.profile = {name: account.name || '', monthlyBudget: 0, savingsGoal: 0, savingsCurrent: 0};
+      state.tasks = [];
+      state.transactions = [];
+      state.vehicles = [];
+      state.settings.interests = [];
+      state.meta.setupComplete = false;
+      setupStep = 1;
+    }
+    nativeState.launchAuthMode = 'authenticated';
+    gateError = '';
+    saveState(false);
+    render();
+  },
+  onGoogleSignInError(code) {
+    gateError = code === 'configuration' ? o('signInConfig') : o('signInError');
+    renderGate();
+  },
+  onBiometricResult(result) {
+    state.settings.biometricEnabled = Boolean(result?.enabled);
+    nativeState.biometricEnabled = Boolean(result?.enabled);
+    saveState(false);
+    if (result?.status === 'unavailable') gateError = o('biometricUnavailable');
+    render();
+  },
+  onSignedOut() {
+    state.meta.lastAccountEmail = state.account?.email || state.meta?.lastAccountEmail || '';
+    state.account = null;
+    nativeState.launchAuthMode = 'google_required';
+    setupStep = 1;
+    saveState(false);
+    render();
+  }
+};
+
 function init() {
   document.documentElement.lang = lang();
   $$('.nav-icon').forEach(el => el.innerHTML = icons[el.dataset.icon]);
@@ -402,7 +825,8 @@ function init() {
     setThemeIcon();
   });
 
-  if (localStorage.getItem('nexora-theme') === 'light') {
+  const savedTheme = localStorage.getItem('nexora-theme');
+  if (savedTheme === 'light' || (!savedTheme && window.window.matchMedia?.('(prefers-color-scheme: light)').matches)) {
     document.documentElement.classList.add('light');
   }
   setThemeIcon();
@@ -417,6 +841,7 @@ function init() {
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
   render();
+  renderGate();
 }
 
 function applyNavLabels() {
@@ -444,6 +869,7 @@ function render() {
   $('#pageTitle').textContent = t(`pages.${currentView}`);
   $('#app').innerHTML = views[currentView]();
   bindView();
+  renderGate();
 }
 
 function monthTransactions() {
@@ -476,6 +902,22 @@ function categoryTotals() {
   return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 5);
 }
 
+
+function homeQuickActions(firstVehicle) {
+  const interests = state.settings.interests || [];
+  const priority = [];
+  if (interests.includes('money') || interests.includes('bills')) priority.push('money');
+  if (interests.includes('garage')) priority.push('garage');
+  if (interests.includes('personal') || interests.includes('work')) priority.push('task');
+  for (const fallback of ['task','money','garage']) if (!priority.includes(fallback)) priority.push(fallback);
+
+  return priority.slice(0,3).map(type => {
+    if (type === 'task') return `<button class="quick-action" data-add="task"><span class="quick-action-icon">${icons.plus}</span><span>${t('addTask')}</span></button>`;
+    if (type === 'money') return `<button class="quick-action" data-add="transaction"><span class="quick-action-icon">${icons.receipt}</span><span>${t('addExpense')}</span></button>`;
+    return `<button class="quick-action" ${firstVehicle ? `data-car-expense="${firstVehicle.id}"` : 'data-add="vehicle"'}><span class="quick-action-icon">${icons.wrench}</span><span>${firstVehicle ? t('carCost') : t('addCar')}</span></button>`;
+  }).join('');
+}
+
 const views = {
   home() {
     const spend = spentThisMonth();
@@ -498,24 +940,27 @@ const views = {
             <div class="tiny right muted">${Math.round(Math.min(100, pct))}%<br>${t('usedPercent')}</div>
           </div>
         </section>`
-      : `<section class="card hero">
-          <div class="hero-kicker">${t('systemReady')}</div>
-          <h2>${t('noBudgetTitle')}</h2>
-          <div class="hero-caption">${t('noBudgetText')}</div>
-          <div class="actions" style="margin-top:18px">
-            <button class="primary" data-open-settings>${t('setupNow')}</button>
-            <button class="secondary" data-add="task">${t('addTask')}</button>
-          </div>
-        </section>`;
+      : state.meta.setupComplete
+        ? `<section class="card hero">
+            <div class="hero-kicker">${t('homeWelcome')} ${greeting()}, ${esc(name)}</div>
+            <h2>${t('dayReadyTitle')}</h2>
+            <div class="hero-caption">${tasks.length ? `${tasks.length} ${t('dayReadyTasks')}.` : t('dayReadyClear')}</div>
+            <div class="actions" style="margin-top:18px"><button class="primary" data-add="task">${t('addTask')}</button><button class="secondary" data-add="transaction">${t('addExpense')}</button></div>
+          </section>`
+        : `<section class="card hero">
+            <div class="hero-kicker">${t('systemReady')}</div>
+            <h2>${t('noBudgetTitle')}</h2>
+            <div class="hero-caption">${t('noBudgetText')}</div>
+            <div class="actions" style="margin-top:18px">
+              <button class="primary" data-open-settings>${t('setupNow')}</button>
+              <button class="secondary" data-add="task">${t('addTask')}</button>
+            </div>
+          </section>`;
 
     return `<div class="stack">
       ${hero}
       ${state.meta.firstOpen ? `<section class="card soft"><div class="insight"><b>${t('firstOpenCard')}</b><span class="small muted">${t('firstOpenSub')}</span></div></section>` : ''}
-      <section class="quick-actions" aria-label="Quick actions">
-        <button class="quick-action" data-add="task"><span class="quick-action-icon">${icons.plus}</span><span>${t('addTask')}</span></button>
-        <button class="quick-action" data-add="transaction"><span class="quick-action-icon">${icons.receipt}</span><span>${t('addExpense')}</span></button>
-        <button class="quick-action" ${firstVehicle ? `data-car-expense="${firstVehicle.id}"` : 'data-add="vehicle"'}><span class="quick-action-icon">${icons.wrench}</span><span>${firstVehicle ? t('carCost') : t('addCar')}</span></button>
-      </section>
+      <section class="quick-actions" aria-label="Quick actions">${homeQuickActions(firstVehicle)}</section>
       <div class="grid-3">
         <section class="card kpi good-card"><div class="label">${t('income')}</div><div class="value money-pos">${money(incomeThisMonth())}</div><div class="delta muted">${t('thisMonth')}</div></section>
         <section class="card kpi"><div class="label">${t('garage')}</div><div class="value">${money(garageSpend())}</div><div class="delta muted">${t('carCosts')}</div></section>
@@ -580,19 +1025,24 @@ const views = {
   profile() {
     const currentLangLabel = lang() === 'et' ? t('estonian') : t('english');
     const p = state.profile;
-    const initials = (p.name || 'N').trim().slice(0, 1).toUpperCase();
+    const biometricOn = Boolean(state.settings.biometricEnabled && nativeState.biometricEnabled);
+    const requireAuth = state.settings.requireAuth !== false;
     return `<div class="stack">
       <section class="card brand-card">
         <img class="brand-wordmark dark-logo" src="nexora-wordmark-dark.png" alt="Nexora" />
         <img class="brand-wordmark light-logo" src="nexora-wordmark-light.png" alt="Nexora" />
-        <div class="brand-version">Nexora · 1.1.0</div>
+        <div class="brand-version">Nexora · 1.2.0</div>
       </section>
-      <section class="card profile-hero">
-        <div class="avatar">${esc(initials)}</div>
-        <div>
-          <div class="vehicle-name" style="font-size:22px">${esc(p.name || 'Nexora')}</div>
-          <div class="muted small">${t('profileSubtitle')}</div>
-        </div>
+      <section class="card">
+        <div class="section-title"><h3>${o('account')}</h3><span class="pill">Google</span></div>
+        <div class="settings-account" style="margin-top:12px">${accountAvatar()}<div class="row-main"><div class="row-title">${esc(state.account?.name || p.name || 'Nexora')}</div><div class="account-email">${esc(state.account?.email || '')}</div></div></div>
+        <div class="small muted" style="margin-top:12px">${o('signedInWithGoogle')}</div>
+        <div class="actions" style="margin-top:14px"><button class="danger" data-signout>${o('signOut')}</button></div>
+      </section>
+      <section class="card">
+        <div class="section-title"><h3>${o('security')}</h3></div>
+        <div class="toggle-row"><div><div class="row-title">${o('biometric')}</div><div class="row-sub">${o('biometricHint')}</div></div><button class="switch ${biometricOn?'on':''}" data-toggle-biometric aria-label="${o('biometric')}"></button></div>
+        <div class="toggle-row"><div><div class="row-title">${o('requireAuth')}</div><div class="row-sub">${o('requireAuthHint')}</div></div><button class="switch ${requireAuth?'on':''}" data-toggle-auth aria-label="${o('requireAuth')}"></button></div>
       </section>
       <section class="card">
         <div class="section-title"><h3>${t('personalInfo')}</h3><button class="ghost" data-edit-profile>${t('edit')}</button></div>
@@ -734,6 +1184,26 @@ function bindView() {
   $('[data-open-settings]')?.addEventListener('click', openSettings);
   $('[data-export]')?.addEventListener('click', exportData);
   $('[data-reset]')?.addEventListener('click', resetData);
+  $('[data-signout]')?.addEventListener('click', () => {
+    try { window.NexoraNative?.signOut(); }
+    catch { window.NexoraApp.onSignedOut(); }
+  });
+  $('[data-toggle-biometric]')?.addEventListener('click', () => {
+    if (!nativeState.biometricAvailable) {
+      gateError = o('biometricUnavailable');
+      return;
+    }
+    try {
+      if (state.settings.biometricEnabled) window.NexoraNative?.disableBiometric();
+      else window.NexoraNative?.enableBiometric();
+    } catch {}
+  });
+  $('[data-toggle-auth]')?.addEventListener('click', () => {
+    state.settings.requireAuth = !state.settings.requireAuth;
+    nativeState.requireAuth = state.settings.requireAuth;
+    try { window.NexoraNative?.setRequireAuth(state.settings.requireAuth); } catch {}
+    saveState();
+  });
 }
 
 function exportData() {
@@ -747,8 +1217,18 @@ function exportData() {
 
 function resetData() {
   if (!confirm(t('resetConfirm'))) return;
-  localStorage.removeItem('nexora-state');
+  const account = state.account ? {...state.account} : null;
+  const language = state.settings.language;
+  const requireAuth = state.settings.requireAuth;
+  const biometricEnabled = state.settings.biometricEnabled;
   state = clone(cleanDefaults);
+  state.account = account;
+  state.settings.language = language;
+  state.settings.requireAuth = requireAuth;
+  state.settings.biometricEnabled = biometricEnabled;
+  state.profile.name = account?.name || '';
+  state.meta.setupComplete = Boolean(account);
+  state.meta.firstOpen = false;
   closeModal();
   saveState();
 }
@@ -849,14 +1329,20 @@ function openVehicleUpdate(id) {
   const vehicle = state.vehicles.find(x => x.id === id);
   if (!vehicle) return;
   showModal(modalForm(`${t('updateFor')} · ${vehicle.name}`, `
-      <div class="field"><label>${t('currentOdometer')}</label><input name="odometer" type="number" min="0" value="${vehicle.odometer || 0}" required></div>
+      <div class="field"><label>${t('vehicle')}</label><input name="name" value="${esc(vehicle.name || '')}" required></div>
+      <div class="grid-2"><div class="field"><label>${t('plate')}</label><input name="plate" value="${esc(vehicle.plate || '')}"></div><div class="field"><label>${t('currentOdometer')}</label><input name="odometer" type="number" min="0" value="${vehicle.odometer || 0}" required></div></div>
       <div class="field"><label>${t('nextServiceAt')}</label><input name="nextServiceKm" type="number" min="0" value="${vehicle.nextServiceKm || 0}"></div>
+      <div class="grid-2"><div class="field"><label>${t('insuranceRenewal')}</label><input name="insuranceDate" type="date" value="${esc(vehicle.insuranceDate || '')}"></div><div class="field"><label>${t('inspection')}</label><input name="inspectionDate" type="date" value="${esc(vehicle.inspectionDate || '')}"></div></div>
     `));
   $('#modalForm').onsubmit = e => {
     e.preventDefault();
     const f = new FormData(e.target);
-    vehicle.odometer = Number(f.get('odometer'));
-    vehicle.nextServiceKm = Number(f.get('nextServiceKm'));
+    vehicle.name = String(f.get('name') || '').trim();
+    vehicle.plate = String(f.get('plate') || '').trim();
+    vehicle.odometer = Number(f.get('odometer') || 0);
+    vehicle.nextServiceKm = Number(f.get('nextServiceKm') || 0);
+    vehicle.insuranceDate = String(f.get('insuranceDate') || '');
+    vehicle.inspectionDate = String(f.get('inspectionDate') || '');
     closeModal();
     saveState();
   };
@@ -886,14 +1372,24 @@ function openProfile() {
 }
 
 function openSettings() {
+  const savedTheme = localStorage.getItem('nexora-theme') || 'system';
   showModal(modalForm(t('appSettings'), `
     <div class="field"><label>${t('language')}</label><select name="language"><option value="et" ${lang() === 'et' ? 'selected' : ''}>${t('estonian')}</option><option value="en" ${lang() === 'en' ? 'selected' : ''}>${t('english')}</option></select></div>
-    <div class="field"><label>${t('themeLabel')}</label><div class="card soft" style="padding:14px"><div class="small muted">${t('themeModeHint')}</div></div></div>
+    <div class="field"><label>${t('themeLabel')}</label><select name="theme"><option value="system" ${savedTheme==='system'?'selected':''}>${o('systemTheme')}</option><option value="dark" ${savedTheme==='dark'?'selected':''}>${o('darkTheme')}</option><option value="light" ${savedTheme==='light'?'selected':''}>${o('lightTheme')}</option></select></div>
   `, t('saveSettings')));
   $('#modalForm').onsubmit = e => {
     e.preventDefault();
     const f = new FormData(e.target);
     state.settings.language = String(f.get('language') || 'et');
+    const theme = String(f.get('theme') || 'system');
+    if (theme === 'system') {
+      localStorage.removeItem('nexora-theme');
+      document.documentElement.classList.toggle('light', window.matchMedia?.('(prefers-color-scheme: light)').matches || false);
+    } else {
+      localStorage.setItem('nexora-theme', theme);
+      document.documentElement.classList.toggle('light', theme === 'light');
+    }
+    setThemeIcon();
     closeModal();
     saveState();
   };

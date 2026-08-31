@@ -2,19 +2,39 @@ plugins {
     id 'com.android.application'
 }
 
+def googleWebClientId = System.getenv('GOOGLE_WEB_CLIENT_ID') ?: ''
+def escapedGoogleClientId = googleWebClientId.replace('\\', '\\\\').replace('"', '\\"')
+
 android {
     namespace 'com.nexora.app'
     compileSdk 35
 
     defaultConfig {
         applicationId 'com.nexora.app'
-        minSdk 26
+        minSdk 28
         targetSdk 35
-        versionCode 4
-        versionName '1.1.0'
+        versionCode 5
+        versionName '1.2.0'
+        buildConfigField 'String', 'GOOGLE_WEB_CLIENT_ID', '"' + escapedGoogleClientId + '"'
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    signingConfigs {
+        debug {
+            storeFile file('../keystore/nexora-debug.keystore')
+            storePassword 'android'
+            keyAlias 'nexora_debug'
+            keyPassword 'android'
+        }
     }
 
     buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
@@ -27,8 +47,16 @@ android {
     }
 }
 
-// Intentionally no AndroidX/Kotlin runtime dependencies.
-// Nexora's interface runs in the built-in Android WebView, so keeping this
-// wrapper dependency-free avoids Kotlin stdlib duplicate-class conflicts.
+configurations.configureEach {
+    // Kotlin 1.8+ merged jdk7/jdk8 extensions into the main stdlib. Excluding
+    // legacy compatibility artifacts prevents duplicate-class failures when
+    // Credential Manager and Google identity dependencies resolve together.
+    exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
+    exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
+}
+
 dependencies {
+    implementation 'androidx.credentials:credentials:1.6.0'
+    implementation 'androidx.credentials:credentials-play-services-auth:1.6.0'
+    implementation 'com.google.android.libraries.identity.googleid:googleid:1.2.0'
 }
