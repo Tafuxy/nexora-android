@@ -1,0 +1,10 @@
+{
+  "name":"Nexora",
+  "short_name":"Nexora",
+  "start_url":"/",
+  "display":"standalone",
+  "background_color":"#0b0d10",
+  "theme_color":"#0b0d10",
+  "description":"Planner, money and garage in one personal dashboard.",
+  "icons":[]
+}

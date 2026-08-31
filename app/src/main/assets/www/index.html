@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#090b0f" />
+  <meta name="description" content="Nexora — planner, money and garage in one personal dashboard." />
+  <title>Nexora</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow" id="todayLabel"></div>
+        <h1 id="pageTitle">Home</h1>
+      </div>
+      <button class="icon-btn" id="themeBtn" aria-label="Toggle theme"></button>
+    </header>
+
+    <main id="app" class="content"></main>
+
+    <nav class="bottom-nav" aria-label="Primary">
+      <button class="nav-item active" data-view="home"><span class="nav-icon" data-icon="home"></span><span>Home</span></button>
+      <button class="nav-item" data-view="planner"><span class="nav-icon" data-icon="calendar"></span><span>Planner</span></button>
+      <button class="nav-item" data-view="money"><span class="nav-icon" data-icon="wallet"></span><span>Money</span></button>
+      <button class="nav-item" data-view="garage"><span class="nav-icon" data-icon="car"></span><span>Garage</span></button>
+      <button class="nav-item" data-view="profile"><span class="nav-icon" data-icon="user"></span><span>Profile</span></button>
+    </nav>
+  </div>
+
+  <div class="modal-backdrop hidden" id="modalBackdrop">
+    <section class="modal" id="modal" role="dialog" aria-modal="true"></section>
+  </div>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
