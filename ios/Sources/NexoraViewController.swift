@@ -13,6 +13,7 @@ final class NexoraViewController: UIViewController, WKNavigationDelegate, WKScri
     private var authenticationInProgress = false
     private var authenticatedForForeground = false
     private var bankReturnPending = false
+    private var bankReturnHandle = ""
     private let prefs = UserDefaults.standard
 
     override func viewDidLoad() {
@@ -36,7 +37,7 @@ final class NexoraViewController: UIViewController, WKNavigationDelegate, WKScri
     private func observeAppState() {
         NotificationCenter.default.addObserver(self, selector: #selector(appWillResignActive), name: UIApplication.willResignActiveNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(appDidBecomeActive), name: UIApplication.didBecomeActiveNotification, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(bankReturnReceived), name: Notification.Name("NexoraBankReturn"), object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(bankReturnReceived(_:)), name: Notification.Name("NexoraBankReturn"), object: nil)
     }
 
     @objc private func appWillResignActive() {
@@ -50,7 +51,8 @@ final class NexoraViewController: UIViewController, WKNavigationDelegate, WKScri
         unlockIfNeeded()
     }
 
-    @objc private func bankReturnReceived() {
+    @objc private func bankReturnReceived(_ notification: Notification) {
+        bankReturnHandle = notification.userInfo?["handle"] as? String ?? ""
         bankReturnPending = true
         authenticatedForForeground = false
         lockForPrivacy()
@@ -145,7 +147,9 @@ final class NexoraViewController: UIViewController, WKNavigationDelegate, WKScri
                     self.emitNativeState()
                     if self.bankReturnPending {
                         self.bankReturnPending = false
-                        self.webView.evaluateJavaScript("window.NexoraApp && window.NexoraApp.onBankReturn && window.NexoraApp.onBankReturn();")
+                        let handle = self.bankReturnHandle
+                        self.bankReturnHandle = ""
+                        self.webView.evaluateJavaScript("window.NexoraApp && window.NexoraApp.onBankReturn && window.NexoraApp.onBankReturn(\(self.javascriptString(handle)));")
                     }
                 } else {
                     self.lockForPrivacy()
@@ -153,6 +157,14 @@ final class NexoraViewController: UIViewController, WKNavigationDelegate, WKScri
                 }
             }
         }
+    }
+
+    private func javascriptString(_ value: String) -> String {
+        guard let data = try? JSONSerialization.data(withJSONObject: [value], options: []),
+              var text = String(data: data, encoding: .utf8), text.count >= 2 else { return "\"\"" }
+        text.removeFirst()
+        text.removeLast()
+        return text
     }
 
     private func localizedUnlockReason() -> String {

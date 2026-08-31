@@ -18,15 +18,13 @@ jobs:
       - name: Install Wrangler
         run: npm install --global wrangler@4
 
-      - name: Validate required secrets
+      - name: Validate Cloudflare secrets
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          GOCARDLESS_SECRET_ID: ${{ secrets.GOCARDLESS_SECRET_ID }}
-          GOCARDLESS_SECRET_KEY: ${{ secrets.GOCARDLESS_SECRET_KEY }}
           NEXORA_SESSION_SECRET: ${{ secrets.NEXORA_SESSION_SECRET }}
         run: |
-          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID GOCARDLESS_SECRET_ID GOCARDLESS_SECRET_KEY NEXORA_SESSION_SECRET; do
+          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID NEXORA_SESSION_SECRET; do
             if [ -z "${!name}" ]; then
               echo "$name GitHub secret is missing."
               exit 1
@@ -39,14 +37,26 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: wrangler deploy --config backend/wrangler.toml
 
-      - name: Configure Worker secrets
+      - name: Configure core Worker secret
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          GOCARDLESS_SECRET_ID: ${{ secrets.GOCARDLESS_SECRET_ID }}
-          GOCARDLESS_SECRET_KEY: ${{ secrets.GOCARDLESS_SECRET_KEY }}
           NEXORA_SESSION_SECRET: ${{ secrets.NEXORA_SESSION_SECRET }}
         run: |
-          printf '%s' "$GOCARDLESS_SECRET_ID" | wrangler secret put GOCARDLESS_SECRET_ID --config backend/wrangler.toml
-          printf '%s' "$GOCARDLESS_SECRET_KEY" | wrangler secret put GOCARDLESS_SECRET_KEY --config backend/wrangler.toml
           printf '%s' "$NEXORA_SESSION_SECRET" | wrangler secret put NEXORA_SESSION_SECRET --config backend/wrangler.toml
+
+      - name: Configure Enable Banking secrets when available
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          ENABLEBANKING_APP_ID: ${{ secrets.ENABLEBANKING_APP_ID }}
+          ENABLEBANKING_PRIVATE_KEY: ${{ secrets.ENABLEBANKING_PRIVATE_KEY }}
+        run: |
+          if [ -n "$ENABLEBANKING_APP_ID" ] && [ -n "$ENABLEBANKING_PRIVATE_KEY" ]; then
+            printf '%s' "$ENABLEBANKING_APP_ID" | wrangler secret put ENABLEBANKING_APP_ID --config backend/wrangler.toml
+            printf '%s' "$ENABLEBANKING_PRIVATE_KEY" | wrangler secret put ENABLEBANKING_PRIVATE_KEY --config backend/wrangler.toml
+            echo "Enable Banking credentials configured."
+          else
+            echo "Worker deployed without Enable Banking credentials yet."
+            echo "Register the callback URL in Enable Banking, then add ENABLEBANKING_APP_ID and ENABLEBANKING_PRIVATE_KEY and re-run this workflow."
+          fi

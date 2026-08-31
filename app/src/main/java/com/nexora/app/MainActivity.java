@@ -46,6 +46,7 @@ public class MainActivity extends Activity {
     private boolean authenticationInProgress = false;
     private boolean authenticatedForForeground = false;
     private boolean bankReturnPending = false;
+    private String bankReturnHandle = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -308,7 +309,9 @@ public class MainActivity extends Activity {
         emitNativeState();
         if (bankReturnPending) {
             bankReturnPending = false;
-            evaluate("window.NexoraApp && window.NexoraApp.onBankReturn && window.NexoraApp.onBankReturn();");
+            String handle = bankReturnHandle == null ? "" : bankReturnHandle;
+            bankReturnHandle = "";
+            evaluate("window.NexoraApp && window.NexoraApp.onBankReturn && window.NexoraApp.onBankReturn(" + JSONObject.quote(handle) + ");");
         }
     }
 
@@ -395,6 +398,8 @@ public class MainActivity extends Activity {
         if (intent == null) return;
         Uri data = intent.getData();
         if (data != null && "nexora".equalsIgnoreCase(data.getScheme()) && "bank-connected".equalsIgnoreCase(data.getHost())) {
+            bankReturnHandle = data.getQueryParameter("handle");
+            if (bankReturnHandle == null) bankReturnHandle = "";
             bankReturnPending = true;
             authenticatedForForeground = false;
             lockForPrivacy();

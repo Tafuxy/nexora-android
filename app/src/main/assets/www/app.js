@@ -857,7 +857,12 @@ window.NexoraApp = {
       if (!last || Date.now() - last > 15 * 60 * 1000) setTimeout(() => syncBank(false), 250);
     }
   },
-  onBankReturn() {
+  onBankReturn(handle) {
+    if (typeof handle === 'string' && handle.length > 20) {
+      state.bank.handle = handle;
+      state.bank.syncStatus = 'AUTHORIZED';
+      saveState(false);
+    }
     syncBank(true);
   },
   onBiometricResult(result) {

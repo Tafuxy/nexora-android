@@ -15,7 +15,9 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey : Any] = [:]) -> Bool {
         guard url.scheme?.lowercased() == "nexora", url.host?.lowercased() == "bank-connected" else { return false }
-        NotificationCenter.default.post(name: Notification.Name("NexoraBankReturn"), object: nil)
+        let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        let handle = components?.queryItems?.first(where: { $0.name == "handle" })?.value ?? ""
+        NotificationCenter.default.post(name: Notification.Name("NexoraBankReturn"), object: nil, userInfo: ["handle": handle])
         return true
     }
 }
