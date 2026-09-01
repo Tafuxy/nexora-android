@@ -44,3 +44,7 @@ Optional alternative to committing the non-secret Firebase Android config:
 - Bank handles remain signed by `NEXORA_SESSION_SECRET`.
 - FCM notifications respect Nexora's lock-screen privacy setting.
 - Nexora remains biometric/device-lock protected before financial data is shown.
+
+
+## Firebase Android config
+`app/google-services.json` is already included in this package.
