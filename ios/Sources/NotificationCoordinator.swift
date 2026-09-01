@@ -9,6 +9,7 @@ final class NotificationCoordinator {
     private let seenKey = "nexora_seen_bank_keys"
     private let seededKey = "nexora_bank_seeded"
     private let reminderKey = "nexora_reminder_keys"
+    private let reminderSignatureKey = "nexora_reminder_signature"
 
     private init() {}
 
@@ -18,7 +19,24 @@ final class NotificationCoordinator {
 
     func updateConfig(json: String) {
         defaults.set(json, forKey: configKey)
+        let signature = reminderSignature(json: json)
+        if defaults.string(forKey: reminderSignatureKey) == signature { return }
+        defaults.set(signature, forKey: reminderSignatureKey)
         scheduleLocalReminders()
+    }
+
+    private func reminderSignature(json: String) -> String {
+        guard let data = json.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return json }
+        let relevant: [String: Any] = [
+            "language": object["language"] ?? "et",
+            "notifications": object["notifications"] ?? [:],
+            "bills": object["bills"] ?? [],
+            "vehicles": object["vehicles"] ?? [],
+            "budget": object["budget"] ?? [:]
+        ]
+        guard let out = try? JSONSerialization.data(withJSONObject: relevant, options: [.sortedKeys]) else { return json }
+        return String(data: out, encoding: .utf8) ?? json
     }
 
     func performBackgroundSync(completion: @escaping (UIBackgroundFetchResult) -> Void) {

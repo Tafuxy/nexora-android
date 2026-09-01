@@ -30,7 +30,7 @@ export default {
           <h2>Device data</h2>
           <p>Your Nexora data is primarily stored on your device. Biometric templates are handled only by Android or iOS and are never available to Nexora.</p>
           <h2>Notifications</h2>
-          <p>If you allow notifications, Nexora may alert you about incoming or outgoing money, bill due dates, spending limits, vehicle service, insurance and inspection dates. Android push delivery uses Firebase Cloud Messaging and a device-specific Firebase Installation ID. Notification detail level can be changed in Nexora settings.</p>
+          <p>If you allow notifications, Nexora may alert you about incoming or outgoing money, bill due dates, spending limits, vehicle service, insurance and inspection dates. Android push delivery uses Firebase Cloud Messaging and a device-specific Firebase registration token. Notification detail level can be changed in Nexora settings.</p>
           <h2>Contact</h2>
           <p>For data protection questions, contact the email address registered for the Nexora Enable Banking application.</p>
         `);
@@ -220,7 +220,24 @@ export default {
         const body = await readJson(request);
         const installId = validateInstall(body.install_id);
         const row = await registryRequest(env, `/get?install=${encodeURIComponent(installId)}`);
-        return json({ registered: Boolean(row?.registration), push_configured: pushConfigured(env), last_poll: row?.registration?.lastPollAt || null, last_error: row?.registration?.lastError || '' });
+        return json({ registered: Boolean(row?.registration), push_configured: pushConfigured(env), registered_at: row?.registration?.updatedAt || null, last_poll: row?.registration?.lastPollAt || null, next_poll: row?.registration?.nextPollAt || null, last_error: row?.registration?.lastError || '' });
+      }
+
+      if (url.pathname === '/api/push/test' && request.method === 'POST') {
+        requireConfigured(env);
+        if (!pushConfigured(env)) throw httpError(503, 'Push notifications are not configured');
+        const body = await readJson(request);
+        const installId = validateInstall(body.install_id);
+        const row = await registryRequest(env, `/get?install=${encodeURIComponent(installId)}`);
+        const registration = row?.registration;
+        if (!registration?.token) throw httpError(409, 'This phone has not registered for push notifications yet');
+        const et = registration.language !== 'en';
+        await sendFcm(env, registration.token, {
+          title: 'Nexora',
+          body: et ? 'Testteavitus töötab.' : 'Test notification is working.',
+          data: { type: 'test', bank_key: `test-${Date.now()}` }
+        });
+        return json({ ok: true, registered: true });
       }
 
       if (url.pathname === '/api/disconnect' && request.method === 'POST') {

@@ -534,7 +534,7 @@ const cleanDefaults = {
   bills: [],
   vehicles: [],
   bank: { installId: '', handle: '', connected: false, institutionId: '', accounts: [], lastSync: '', syncStatus: '', syncWarning: '', lastTotalBalance: null },
-  meta: { firstOpen: true, setupComplete: false, appVersion: '1.7.1' }
+  meta: { firstOpen: true, setupComplete: false, appVersion: '1.8.2' }
 };
 
 const DEMO_TASKS = ['Review today’s priorities', 'Check upcoming car costs'];
@@ -618,7 +618,7 @@ function sanitizeState(input) {
   s.bank.accounts = Array.isArray(s.bank.accounts) ? s.bank.accounts : [];
   s.bank.installId = String(s.bank.installId || '');
   if (!s.bank.installId) s.bank.installId = `install-${uid()}`;
-  s.meta = { ...(s.meta || {}), appVersion: '1.7.1', firstOpen: Boolean(s.meta?.firstOpen), setupComplete: Boolean(s.meta?.setupComplete) };
+  s.meta = { ...(s.meta || {}), appVersion: '1.8.2', firstOpen: Boolean(s.meta?.firstOpen), setupComplete: Boolean(s.meta?.setupComplete) };
   return s;
 }
 
@@ -974,7 +974,8 @@ function init() {
     $$('.nav-item').forEach(x => x.classList.toggle('active', x === btn));
     render();
     refreshBankAutoTimer();
-    if (currentView === 'money') setTimeout(() => requestAutoSync(15000), 120);
+    // Bank data is app-level state, not Money-view state. Refresh from any tab.
+    setTimeout(() => requestAutoSync(15000), 120);
   }));
 
   $('#modalBackdrop').addEventListener('click', e => { if (e.target.id === 'modalBackdrop') closeModal(); });
@@ -1178,7 +1179,7 @@ function requestAutoSync(minAgeMs = 30000) {
 function refreshBankAutoTimer() {
   if (bankAutoTimer) clearInterval(bankAutoTimer);
   bankAutoTimer = null;
-  if (currentView === 'money' && state.bank.handle && bankApiConfigured() && !nativeState.authPending) {
+  if (state.bank.handle && bankApiConfigured() && !nativeState.authPending) {
     bankAutoTimer = setInterval(() => {
       if (!document.hidden) requestAutoSync(45000);
     }, 60000);
@@ -1464,7 +1465,7 @@ function notificationText(key) {
     vehicles: 'Auto hooldus ja tähtajad', budget: 'Kululimiidi hoiatused', privacy: 'Lukuekraani privaatsus',
     full: 'Näita summat ja detaile', hideAmount: 'Peida summa', generic: 'Ainult üldine teavitus',
     hint: 'Nexora annab märku raha liikumisest ning lähenevatest arvetest ja auto tähtaegadest.',
-    save: 'Salvesta', permission: 'Luba teavitused', background: 'Pangasünki kontrollitakse taustal automaatselt.'
+    save: 'Salvesta', permission: 'Luba teavitused', background: 'Pangasünki kontrollitakse taustal automaatselt.', test: 'Saada testteavitus', testSent: 'Testteavitus saadetud', testError: 'Testteavitust ei saanud saata'
   };
   const en = {
     title: 'Notifications', configure: 'Configure', status: 'Background active',
@@ -1472,7 +1473,7 @@ function notificationText(key) {
     vehicles: 'Vehicle service and deadlines', budget: 'Spending limit warnings', privacy: 'Lock screen privacy',
     full: 'Show amount and details', hideAmount: 'Hide amount', generic: 'Generic notification only',
     hint: 'Nexora can alert you about bank activity, upcoming bills and vehicle deadlines.',
-    save: 'Save', permission: 'Allow notifications', background: 'Bank activity is checked automatically in the background.'
+    save: 'Save', permission: 'Allow notifications', background: 'Bank activity is checked automatically in the background.', test: 'Send test notification', testSent: 'Test notification sent', testError: 'Could not send test notification'
   };
   return (lang() === 'et' ? et : en)[key] || key;
 }
@@ -1492,7 +1493,20 @@ function openNotificationSettings() {
       <option value="generic" ${n.privacy==='generic'?'selected':''}>${notificationText('generic')}</option>
     </select></div>
     <div class="small muted">${notificationText('background')}</div>
+    <button type="button" class="secondary" data-test-push>${notificationText('test')}</button>
   `, notificationText('save')));
+  $('[data-test-push]')?.addEventListener('click', async () => {
+    const btn = $('[data-test-push]');
+    if (btn) btn.disabled = true;
+    try {
+      await apiJson('/api/push/test', { method: 'POST', body: JSON.stringify({ install_id: state.bank.installId }) });
+      alert(notificationText('testSent'));
+    } catch (error) {
+      alert(`${notificationText('testError')}: ${error.message || 'Unknown error'}`);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  });
   $('#modalForm').onsubmit = e => {
     e.preventDefault();
     const f = new FormData(e.target);
@@ -1670,7 +1684,7 @@ const views = {
       <section class="card brand-card">
         <img class="brand-wordmark dark-logo" src="nexora-wordmark-dark.png" alt="Nexora" />
         <img class="brand-wordmark light-logo" src="nexora-wordmark-light.png" alt="Nexora" />
-        <div class="brand-version">Nexora · 1.7.1</div>
+        <div class="brand-version">Nexora · 1.8.2</div>
       </section>
       <section class="card">
         <div class="section-title"><h3>${t('statistics')}</h3></div>
@@ -1742,14 +1756,14 @@ function taskRow(item) {
 }
 
 function txRow(item) {
-  return `<div class="row">
+  return `<div class="row transaction-row">
       <span class="dot ${item.type === 'income' ? 'good' : 'bad'}"></span>
       <div class="row-main">
         <div class="row-title">${esc(item.note || categoryLabel(item.category || 'Other'))}</div>
         <div class="row-sub">${esc(categoryLabel(item.category || 'Other'))} · ${fmtDate(item.date)}</div>
       </div>
-      <strong class="${item.type === 'income' ? 'money-pos' : 'money-neg'}">${item.type === 'income' ? '+' : '−'}${money(item.amount)}</strong>
-      <button class="delete-btn" data-delete-tx="${item.id}" aria-label="delete">×</button>
+      <strong class="transaction-amount ${item.type === 'income' ? 'money-pos' : 'money-neg'}">${item.type === 'income' ? '+' : '−'}${money(item.amount)}</strong>
+      <button class="delete-btn transaction-delete" data-delete-tx="${item.id}" aria-label="delete">×</button>
     </div>`;
 }
 

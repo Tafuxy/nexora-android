@@ -36,7 +36,6 @@ public class BackgroundSyncJobService extends JobService {
     private static final String REMINDER_KEYS = "reminder_keys";
     private static final String SEEDED = "bank_seeded";
     private static final int PERIODIC_JOB = 77101;
-    private static final int ONE_SHOT_JOB = 77102;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
     static void saveConfig(Context context, String json) {
@@ -47,20 +46,19 @@ public class BackgroundSyncJobService extends JobService {
     static void schedule(Context context) {
         JobScheduler scheduler = (JobScheduler) context.getSystemService(Context.JOB_SCHEDULER_SERVICE);
         if (scheduler == null) return;
+
+        // Bills / vehicle / budget reminders are day-level events. A 12-hour, OS-batched
+        // job is enough and avoids waking the app repeatedly. Bank activity push is handled
+        // by the Cloudflare + FCM backend, so this job performs no bank network polling.
+        if (scheduler.getPendingJob(PERIODIC_JOB) != null) return;
+
         ComponentName component = new ComponentName(context, BackgroundSyncJobService.class);
         JobInfo periodic = new JobInfo.Builder(PERIODIC_JOB, component)
-                .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
-                .setPeriodic(6 * 60 * 60 * 1000L)
+                .setPeriodic(12 * 60 * 60 * 1000L)
                 .setPersisted(true)
+                .setRequiresBatteryNotLow(true)
                 .build();
         scheduler.schedule(periodic);
-
-        JobInfo immediate = new JobInfo.Builder(ONE_SHOT_JOB, component)
-                .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
-                .setMinimumLatency(2_000L)
-                .setOverrideDeadline(20_000L)
-                .build();
-        scheduler.schedule(immediate);
     }
 
     @Override

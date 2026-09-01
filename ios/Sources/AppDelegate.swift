@@ -13,7 +13,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationC
         self.window = window
 
         UNUserNotificationCenter.current().delegate = self
-        application.setMinimumBackgroundFetchInterval(UIApplication.backgroundFetchIntervalMinimum)
+        application.setMinimumBackgroundFetchInterval(6 * 60 * 60)
         return true
     }
 

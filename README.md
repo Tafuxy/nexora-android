@@ -1,57 +1,50 @@
-# Nexora 1.8.1 — Android FCM push + bank sync
+# Nexora v1.8.3
 
-This package adds server-triggered Android push notifications through Firebase Cloud Messaging (FCM), while keeping Nexora's existing Enable Banking + Cloudflare architecture.
+Personal finance, planner and garage app for Android/iOS.
 
-## Important bank limitation
+## v1.8.3 reliability + battery fixes
 
-Enable Banking documents that many ASPSPs limit genuine background account-information fetches to roughly four requests per day. Nexora therefore **does not fake PSU headers and does not poll the bank every minute**. The Cloudflare Worker checks in the background on a six-hour schedule. When the user is actively using/unlocking Nexora, normal app sync remains immediate.
+- **No synthetic bank income/expense.** Nexora no longer converts a balance delta into a guessed transaction.
+- Older `bank-provisional` / `balance-delta:*` rows created by earlier builds are removed automatically during state migration.
+- A temporary bank/API failure can no longer overwrite the last trustworthy account list or balances with empty/null data.
+- Bank account balances keep the latest known good value if a sync returns a temporary missing balance.
+- Failed syncs show a warning while the last good bank state remains visible.
+- Successful account state is cached as `lastGoodAccounts` for resilience.
+- Foreground 60-second polling was removed. Bank sync is now event-driven: unlock/resume and opening Money, plus manual sync.
+- Android local reminder work is OS-batched every ~12 hours and only when battery is not low. It does **not** poll the bank.
+- Cloudflare + FCM remains responsible for bank-activity push polling on the PSD2-safe server interval.
+- Native notification config updates are deduplicated so normal UI/localStorage changes do not repeatedly wake native scheduling or FCM registration.
+- iOS background fetch minimum changed from Apple's minimum interval to 6 hours; local notification schedules are rebuilt only when reminder-relevant settings actually change.
+- Settings → Notifications now shows push diagnostics: phone registration, local FCM token state, registration time, last server bank poll, next poll and last push error.
+- Test notification remains available.
 
-FCM delivery itself is immediate once the Worker has discovered a new transaction.
+## Versions
 
-## One-time Firebase setup
+- Android: 1.8.3 (`versionCode 19`)
+- iOS: 1.8.3 (`build 19`)
 
-1. Create a Firebase project named Nexora.
-2. Add an Android app with package `com.nexora.app`.
-3. Download `google-services.json` and put it at `app/google-services.json` before committing, **or** store its complete JSON as GitHub repository secret `FIREBASE_GOOGLE_SERVICES_JSON`.
-4. In Firebase Project settings → Service accounts, generate a private key JSON file. Keep it private. Store the **complete JSON content** as GitHub repository secret `FIREBASE_SERVICE_ACCOUNT_JSON`.
-5. Push the repository files.
-6. GitHub Actions → `Deploy Nexora Bank Backend` → Run workflow.
-7. Check `https://nexora-bank.stennapsep253.workers.dev/health`. `push_configured` should be `true`.
-8. GitHub Actions → `Build Nexora APK` → Run workflow and install the generated APK.
-9. Open Nexora, unlock it and allow notifications. Nexora uploads its Firebase Installation ID (FID) to the Worker together with the existing signed bank connection handle.
+## Existing configuration retained
 
-## Existing secrets still required
+No existing secrets need to be recreated:
 
-- `CLOUDFLARE_ACCOUNT_ID`
 - `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
 - `ENABLEBANKING_APP_ID`
 - `ENABLEBANKING_PRIVATE_KEY`
 - `NEXORA_SESSION_SECRET`
 - `NEXORA_BANK_API_URL`
-
-New secret:
-
 - `FIREBASE_SERVICE_ACCOUNT_JSON`
 
-Optional alternative to committing the non-secret Firebase Android config:
+`app/google-services.json` remains included.
 
-- `FIREBASE_GOOGLE_SERVICES_JSON`
+## Update order
 
-## Security
+1. Replace repository files with this package.
+2. Commit and push.
+3. Run **Deploy Nexora Bank Backend** (push diagnostics endpoint changed).
+4. Run **Build Nexora APK**.
+5. Install/update Nexora.
+6. Open Nexora once and unlock it.
+7. Settings → Notifications: check the push status and use **Send test notification**.
 
-- Firebase service-account credentials stay in Cloudflare/GitHub secrets and are never bundled into the APK.
-- The Android app registers a Firebase Installation ID (FID), not a Firebase service credential.
-- Bank handles remain signed by `NEXORA_SESSION_SECRET`.
-- FCM notifications respect Nexora's lock-screen privacy setting.
-- Nexora remains biometric/device-lock protected before financial data is shown.
-
-
-## Firebase Android config
-`app/google-services.json` is already included in this package.
-
-
-## v9.1 Android build fix
-
-- AndroidX enabled for Firebase Messaging.
-- Uses the broadly supported FCM registration-token path for Android and HTTP v1 delivery.
-- Removes the FID-only Android registration path that caused compatibility/build issues in v9.
+A transient bank sync error should now leave the last good balances on screen and must never create a fake expense/income.

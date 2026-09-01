@@ -533,8 +533,8 @@ const cleanDefaults = {
   transactions: [],
   bills: [],
   vehicles: [],
-  bank: { installId: '', handle: '', connected: false, institutionId: '', accounts: [], lastSync: '', syncStatus: '', syncWarning: '', lastTotalBalance: null },
-  meta: { firstOpen: true, setupComplete: false, appVersion: '1.8.0' }
+  bank: { installId: '', handle: '', connected: false, institutionId: '', accounts: [], lastGoodAccounts: [], lastSync: '', syncStatus: '', syncWarning: '', lastTotalBalance: null },
+  meta: { firstOpen: true, setupComplete: false, appVersion: '1.8.3' }
 };
 
 const DEMO_TASKS = ['Review today’s priorities', 'Check upcoming car costs'];
@@ -550,9 +550,9 @@ let setupDraft = {};
 const BANK_API_URL = String(window.NEXORA_CONFIG?.bankApiUrl || '').trim().replace(/\/$/, '');
 let bankBusy = false;
 let bankLastAttempt = 0;
-let bankAutoTimer = null;
 const renderedMoneyValues = new Map();
 const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+let lastNativeNotificationPayload = '';
 
 function esc(s = '') {
   return String(s).replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
@@ -602,6 +602,9 @@ function sanitizeState(input) {
   s.profile.savingsCurrent = Number(s.profile.savingsCurrent || 0);
   s.tasks = Array.isArray(s.tasks) ? s.tasks : [];
   s.transactions = Array.isArray(s.transactions) ? s.transactions : [];
+  // Never infer real income/expenses from a temporary balance change. Older builds did
+  // this and could create false spending when a bank sync briefly failed.
+  s.transactions = s.transactions.filter(tx => tx?.source !== 'bank-provisional' && !String(tx?.bankKey || '').startsWith('balance-delta:'));
   s.bills = Array.isArray(s.bills) ? s.bills : [];
   s.vehicles = Array.isArray(s.vehicles) ? s.vehicles : [];
   s.settings.interests = Array.isArray(s.settings?.interests) ? s.settings.interests : [];
@@ -616,9 +619,10 @@ function sanitizeState(input) {
   if (!['full','hideAmount','generic'].includes(s.settings.notifications.privacy)) s.settings.notifications.privacy = 'hideAmount';
   s.bank = deepMerge(cleanDefaults.bank, s.bank || {});
   s.bank.accounts = Array.isArray(s.bank.accounts) ? s.bank.accounts : [];
+  s.bank.lastGoodAccounts = Array.isArray(s.bank.lastGoodAccounts) ? s.bank.lastGoodAccounts : [];
   s.bank.installId = String(s.bank.installId || '');
   if (!s.bank.installId) s.bank.installId = `install-${uid()}`;
-  s.meta = { ...(s.meta || {}), appVersion: '1.8.0', firstOpen: Boolean(s.meta?.firstOpen), setupComplete: Boolean(s.meta?.setupComplete) };
+  s.meta = { ...(s.meta || {}), appVersion: '1.8.3', firstOpen: Boolean(s.meta?.firstOpen), setupComplete: Boolean(s.meta?.setupComplete) };
   return s;
 }
 
@@ -667,7 +671,11 @@ function notificationConfigPayload() {
 function syncNativeNotificationConfig(requestPermission = false) {
   if (!state.meta.setupComplete) return;
   const payload = JSON.stringify(notificationConfigPayload());
-  try { window.NexoraNative?.updateNotificationConfig?.(payload); } catch (_) {}
+  // Avoid waking native code / JobScheduler / FCM registration on every localStorage save.
+  if (payload !== lastNativeNotificationPayload) {
+    lastNativeNotificationPayload = payload;
+    try { window.NexoraNative?.updateNotificationConfig?.(payload); } catch (_) {}
+  }
   if (requestPermission) {
     try { window.NexoraNative?.requestNotificationPermission?.(); } catch (_) {}
   }
@@ -919,14 +927,13 @@ window.NexoraApp = {
     }
     saveState(false);
     renderGate();
-    refreshBankAutoTimer();
     if (state.meta.setupComplete && !nativeState.authPending) {
       syncNativeNotificationConfig(false);
       if (!localStorage.getItem('nexora-notification-permission-v1')) {
         localStorage.setItem('nexora-notification-permission-v1', '1');
         setTimeout(() => syncNativeNotificationConfig(true), 450);
       }
-      if (state.bank.handle && bankApiConfigured()) setTimeout(() => requestAutoSync(8000), 250);
+      if (state.bank.handle && bankApiConfigured()) setTimeout(() => requestAutoSync(60000), 350);
     }
   },
   onBankReturn(handle) {
@@ -973,8 +980,9 @@ function init() {
     currentView = btn.dataset.view;
     $$('.nav-item').forEach(x => x.classList.toggle('active', x === btn));
     render();
-    refreshBankAutoTimer();
-    if (currentView === 'money') setTimeout(() => requestAutoSync(15000), 120);
+    // Avoid polling on every tab change. Money refreshes when the user actually opens it;
+    // app resume/unlock also refreshes independently.
+    if (currentView === 'money') setTimeout(() => requestAutoSync(60000), 160);
   }));
 
   $('#modalBackdrop').addEventListener('click', e => { if (e.target.id === 'modalBackdrop') closeModal(); });
@@ -982,9 +990,8 @@ function init() {
 
   render();
   renderGate();
-  refreshBankAutoTimer();
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) setTimeout(() => requestAutoSync(10000), 250);
+    if (!document.hidden) setTimeout(() => requestAutoSync(60000), 350);
   });
 }
 
@@ -1175,15 +1182,6 @@ function requestAutoSync(minAgeMs = 30000) {
   syncBank(false);
 }
 
-function refreshBankAutoTimer() {
-  if (bankAutoTimer) clearInterval(bankAutoTimer);
-  bankAutoTimer = null;
-  if (currentView === 'money' && state.bank.handle && bankApiConfigured() && !nativeState.authPending) {
-    bankAutoTimer = setInterval(() => {
-      if (!document.hidden) requestAutoSync(45000);
-    }, 60000);
-  }
-}
 
 function bankCardMarkup() {
   if (!bankApiConfigured()) {
@@ -1323,54 +1321,29 @@ function mergeBankTransactions(incoming) {
     };
     if (existing) Object.assign(existing, next); else { state.transactions.push(next); newlyAdded.push(next); }
   }
-  reconcileProvisionalBankDeltas(newlyAdded);
   return newlyAdded;
 }
 
-function reconcileProvisionalBankDeltas(realTransactions) {
-  if (!Array.isArray(realTransactions) || !realTransactions.length) return;
-  const provisionals = state.transactions.filter(tx => tx.source === 'bank-provisional');
-  if (!provisionals.length) return;
-  const removeIds = new Set();
-  for (const real of realTransactions) {
-    const match = provisionals.find(p => {
-      if (removeIds.has(p.id) || p.type !== real.type) return false;
-      if (Math.abs(Number(p.amount || 0) - Number(real.amount || 0)) > 0.009) return false;
-      const pd = new Date(`${p.date}T12:00:00`), rd = new Date(`${real.date}T12:00:00`);
-      return Math.abs(pd - rd) <= 2 * 86400000;
-    });
-    if (match) removeIds.add(match.id);
-  }
-  if (removeIds.size) state.transactions = state.transactions.filter(tx => !removeIds.has(tx.id));
-}
+function mergeBankAccounts(incoming) {
+  const priorRows = (state.bank.accounts || []).length ? state.bank.accounts : (state.bank.lastGoodAccounts || []);
+  const previous = new Map(priorRows.map(account => [String(account?.id || ''), account]));
+  const rows = Array.isArray(incoming) ? incoming : [];
+  if (!rows.length && previous.size) return priorRows;
 
-function totalBankBalance(accounts = state.bank.accounts) {
-  return (accounts || []).reduce((sum, acc) => sum + (Number.isFinite(Number(acc.balance)) ? Number(acc.balance) : 0), 0);
-}
-
-function addProvisionalBalanceDelta(oldTotal, newTotal, newRealTransactions, syncedAt) {
-  if (!Number.isFinite(oldTotal) || !Number.isFinite(newTotal)) return;
-  const balanceDelta = Math.round((newTotal - oldTotal) * 100) / 100;
-  if (Math.abs(balanceDelta) < 0.01) return;
-
-  const realNet = (newRealTransactions || []).reduce((sum, tx) => sum + (tx.type === 'income' ? Number(tx.amount || 0) : -Number(tx.amount || 0)), 0);
-  const residual = Math.round((balanceDelta - realNet) * 100) / 100;
-  if (Math.abs(residual) < 0.01) return;
-
-  const stamp = String(syncedAt || Date.now()).replace(/[^0-9A-Za-z]/g, '').slice(0, 32);
-  const bankKey = `balance-delta:${stamp}:${residual}`;
-  if (state.transactions.some(tx => tx.bankKey === bankKey)) return;
-  state.transactions.push({
-    id: uid(),
-    type: residual > 0 ? 'income' : 'expense',
-    amount: Math.abs(residual),
-    category: residual > 0 ? 'Income' : 'Other',
-    date: todayISO(),
-    note: lang() === 'et' ? 'Panga saldo muutus · tehingu detail ootel' : 'Bank balance changed · transaction details pending',
-    bankKey,
-    bankAccountId: '',
-    source: 'bank-provisional',
-    pending: true
+  return rows.map(account => {
+    const id = String(account?.id || '');
+    const old = previous.get(id) || {};
+    const incomingBalance = Number(account?.balance);
+    const previousBalance = Number(old?.balance);
+    return {
+      ...old,
+      ...account,
+      display_name: String(account?.display_name || old?.display_name || ''),
+      name: String(account?.name || old?.name || ''),
+      iban: String(account?.iban || old?.iban || ''),
+      account_type: String(account?.account_type || old?.account_type || ''),
+      balance: Number.isFinite(incomingBalance) ? incomingBalance : (Number.isFinite(previousBalance) ? previousBalance : null)
+    };
   });
 }
 
@@ -1391,24 +1364,42 @@ async function syncBank(renderDuring = true) {
       method: 'POST',
       body: JSON.stringify({ install_id: state.bank.installId, bank_handle: state.bank.handle })
     });
-    state.bank.connected = Boolean(data.connected);
-    state.bank.syncStatus = data.status || '';
-    const previousTotal = state.bank.lastTotalBalance !== null && state.bank.lastTotalBalance !== '' && Number.isFinite(Number(state.bank.lastTotalBalance)) ? Number(state.bank.lastTotalBalance) : (state.bank.lastSync ? totalBankBalance(state.bank.accounts) : NaN);
-    const nextAccounts = Array.isArray(data.accounts) ? data.accounts : [];
-    state.bank.accounts = nextAccounts;
+
+    // A temporary authorization/API problem must never erase the last trustworthy bank state.
+    if (!data || data.connected !== true) {
+      const status = String(data?.status || 'SYNC_UNAVAILABLE');
+      throw new Error(lang() === 'et'
+        ? `Panga sünk ei õnnestunud (${status}). Näitan viimast salvestatud seisu.`
+        : `Bank sync failed (${status}). Showing the last saved state.`);
+    }
+
+    const incomingAccounts = Array.isArray(data.accounts) ? data.accounts : [];
+    const safeAccounts = mergeBankAccounts(incomingAccounts);
+    if (!incomingAccounts.length && (state.bank.accounts || []).length) {
+      state.bank.syncWarning = lang() === 'et'
+        ? 'Pank ei tagastanud seekord kontode infot. Näitan viimast salvestatud seisu.'
+        : 'The bank did not return account details this time. Showing the last saved state.';
+    } else {
+      state.bank.syncWarning = Array.isArray(data.warnings) && data.warnings.length ? String(data.warnings[0]) : '';
+    }
+
+    state.bank.connected = true;
+    state.bank.syncStatus = data.status || 'AUTHORIZED';
+    state.bank.accounts = safeAccounts;
+    if (safeAccounts.length) state.bank.lastGoodAccounts = clone(safeAccounts);
     state.bank.institutionId = data.institution_id || state.bank.institutionId || '';
     state.bank.lastSync = data.synced_at || state.bank.lastSync || '';
-    state.bank.syncWarning = Array.isArray(data.warnings) && data.warnings.length ? String(data.warnings[0]) : '';
-    const newRealTransactions = mergeBankTransactions(data.transactions || []);
-    const nextTotal = totalBankBalance(nextAccounts);
-    addProvisionalBalanceDelta(previousTotal, nextTotal, newRealTransactions, data.synced_at || '');
-    state.bank.lastTotalBalance = nextTotal;
+    mergeBankTransactions(data.transactions || []);
+    state.bank.lastTotalBalance = totalBankBalance(safeAccounts);
     detectSalaryFromBank();
+    gateError = '';
     saveState(false);
     syncNativeNotificationConfig(false);
   } catch (error) {
+    // Keep accounts, balances and transactions exactly as they were on the last good sync.
     state.bank.syncStatus = 'error';
-    gateError = error.message || b('bankError');
+    state.bank.syncWarning = error?.message || b('bankError');
+    gateError = '';
     saveState(false);
   } finally {
     bankBusy = false;
@@ -1432,6 +1423,7 @@ async function disconnectBank() {
   state.bank.connected = false;
   state.bank.institutionId = '';
   state.bank.accounts = [];
+  state.bank.lastGoodAccounts = [];
   state.bank.lastSync = '';
   state.bank.syncStatus = '';
   state.bank.syncWarning = '';
@@ -1464,7 +1456,8 @@ function notificationText(key) {
     vehicles: 'Auto hooldus ja tähtajad', budget: 'Kululimiidi hoiatused', privacy: 'Lukuekraani privaatsus',
     full: 'Näita summat ja detaile', hideAmount: 'Peida summa', generic: 'Ainult üldine teavitus',
     hint: 'Nexora annab märku raha liikumisest ning lähenevatest arvetest ja auto tähtaegadest.',
-    save: 'Salvesta', permission: 'Luba teavitused', background: 'Pangasünki kontrollitakse taustal automaatselt.'
+    save: 'Salvesta', permission: 'Luba teavitused', background: 'Pangategevuse push toimub serveri kaudu; telefon ei pea selleks taustal panka pollima.', test: 'Saada testteavitus', testSent: 'Testteavitus saadetud', testError: 'Testteavitust ei saanud saata',
+    pushChecking: 'Kontrollin pushi olekut…', pushReady: 'Telefon on push-teavitusteks registreeritud', pushMissing: 'Telefon pole veel push-teavitusteks registreeritud', pushBackendMissing: 'Push-backend pole seadistatud', tokenReady: 'FCM token telefonis olemas', tokenMissing: 'FCM token telefonis puudub', registeredAt: 'Telefon registreeriti', lastPoll: 'Viimane pangakontroll', nextPoll: 'Järgmine taustakontroll', lastError: 'Viimane push-viga'
   };
   const en = {
     title: 'Notifications', configure: 'Configure', status: 'Background active',
@@ -1472,7 +1465,8 @@ function notificationText(key) {
     vehicles: 'Vehicle service and deadlines', budget: 'Spending limit warnings', privacy: 'Lock screen privacy',
     full: 'Show amount and details', hideAmount: 'Hide amount', generic: 'Generic notification only',
     hint: 'Nexora can alert you about bank activity, upcoming bills and vehicle deadlines.',
-    save: 'Save', permission: 'Allow notifications', background: 'Bank activity is checked automatically in the background.'
+    save: 'Save', permission: 'Allow notifications', background: 'Bank activity push is handled by the server; your phone does not need to poll the bank in the background.', test: 'Send test notification', testSent: 'Test notification sent', testError: 'Could not send test notification',
+    pushChecking: 'Checking push status…', pushReady: 'This phone is registered for push notifications', pushMissing: 'This phone is not registered for push notifications yet', pushBackendMissing: 'Push backend is not configured', tokenReady: 'FCM token exists on this phone', tokenMissing: 'FCM token is missing on this phone', registeredAt: 'Phone registered', lastPoll: 'Last bank check', nextPoll: 'Next background check', lastError: 'Last push error'
   };
   return (lang() === 'et' ? et : en)[key] || key;
 }
@@ -1492,7 +1486,55 @@ function openNotificationSettings() {
       <option value="generic" ${n.privacy==='generic'?'selected':''}>${notificationText('generic')}</option>
     </select></div>
     <div class="small muted">${notificationText('background')}</div>
+    <div class="card soft push-status-card" data-push-status><div class="small muted">${notificationText('pushChecking')}</div></div>
+    <button type="button" class="secondary" data-test-push>${notificationText('test')}</button>
   `, notificationText('save')));
+  syncNativeNotificationConfig(true);
+  (async () => {
+    const box = $('[data-push-status]');
+    if (!box || !bankApiConfigured()) return;
+    try {
+      const status = await apiJson('/api/push/status', {
+        method: 'POST',
+        body: JSON.stringify({ install_id: state.bank.installId })
+      });
+      const main = status.registered
+        ? notificationText('pushReady')
+        : notificationText('pushMissing');
+      const details = [];
+      const fmtStamp = value => new Intl.DateTimeFormat(locale(), {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}).format(new Date(value));
+      try {
+        const nativeRaw = window.NexoraNative?.getPushDiagnostics?.();
+        const native = nativeRaw ? JSON.parse(nativeRaw) : null;
+        if (native) {
+          details.push(native.tokenPresent ? notificationText('tokenReady') : notificationText('tokenMissing'));
+          if (native.lastSuccessAt) details.push(`${notificationText('registeredAt')}: ${fmtStamp(native.lastSuccessAt)}`);
+          if (native.lastError) details.push(`${notificationText('lastError')}: ${native.lastError}`);
+        }
+      } catch (_) {}
+      if (!status.push_configured) details.push(notificationText('pushBackendMissing'));
+      if (status.registered_at) details.push(`${notificationText('registeredAt')}: ${fmtStamp(status.registered_at)}`);
+      if (status.last_poll) details.push(`${notificationText('lastPoll')}: ${fmtStamp(status.last_poll)}`);
+      if (status.next_poll) details.push(`${notificationText('nextPoll')}: ${fmtStamp(status.next_poll)}`);
+      if (status.last_error) details.push(`${notificationText('lastError')}: ${status.last_error}`);
+      box.innerHTML = `<div class="row-title">${esc(main)}</div>${details.length ? `<div class="small muted" style="margin-top:5px">${details.map(esc).join('<br>')}</div>` : ''}`;
+    } catch (error) {
+      box.innerHTML = `<div class="small muted">${esc(error?.message || notificationText('testError'))}</div>`;
+    }
+  })();
+
+  $('[data-test-push]')?.addEventListener('click', async () => {
+    const btn = $('[data-test-push]');
+    if (btn) btn.disabled = true;
+    try {
+      await apiJson('/api/push/test', { method: 'POST', body: JSON.stringify({ install_id: state.bank.installId }) });
+      alert(notificationText('testSent'));
+    } catch (error) {
+      alert(`${notificationText('testError')}: ${error.message || 'Unknown error'}`);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  });
   $('#modalForm').onsubmit = e => {
     e.preventDefault();
     const f = new FormData(e.target);
@@ -1670,7 +1712,7 @@ const views = {
       <section class="card brand-card">
         <img class="brand-wordmark dark-logo" src="nexora-wordmark-dark.png" alt="Nexora" />
         <img class="brand-wordmark light-logo" src="nexora-wordmark-light.png" alt="Nexora" />
-        <div class="brand-version">Nexora · 1.7.1</div>
+        <div class="brand-version">Nexora · 1.8.2</div>
       </section>
       <section class="card">
         <div class="section-title"><h3>${t('statistics')}</h3></div>
@@ -1742,14 +1784,14 @@ function taskRow(item) {
 }
 
 function txRow(item) {
-  return `<div class="row">
+  return `<div class="row transaction-row">
       <span class="dot ${item.type === 'income' ? 'good' : 'bad'}"></span>
       <div class="row-main">
         <div class="row-title">${esc(item.note || categoryLabel(item.category || 'Other'))}</div>
         <div class="row-sub">${esc(categoryLabel(item.category || 'Other'))} · ${fmtDate(item.date)}</div>
       </div>
-      <strong class="${item.type === 'income' ? 'money-pos' : 'money-neg'}">${item.type === 'income' ? '+' : '−'}${money(item.amount)}</strong>
-      <button class="delete-btn" data-delete-tx="${item.id}" aria-label="delete">×</button>
+      <strong class="transaction-amount ${item.type === 'income' ? 'money-pos' : 'money-neg'}">${item.type === 'income' ? '+' : '−'}${money(item.amount)}</strong>
+      <button class="delete-btn transaction-delete" data-delete-tx="${item.id}" aria-label="delete">×</button>
     </div>`;
 }
 

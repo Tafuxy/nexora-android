@@ -19,6 +19,9 @@ final class PushRegistration {
     private static final String PREFS = "nexora_push";
     private static final String TOKEN = "fcm_token";
     private static final String CONFIG = "push_config";
+    private static final String SIGNATURE = "push_signature";
+    private static final String LAST_ERROR = "last_error";
+    private static final String LAST_SUCCESS_AT = "last_success_at";
     private static final ExecutorService EXECUTOR = Executors.newSingleThreadExecutor();
 
     private PushRegistration() {}
@@ -37,9 +40,36 @@ final class PushRegistration {
     }
 
     static void updateConfig(Context context, String json) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .edit().putString(CONFIG, json == null ? "{}" : json).apply();
+        String next = json == null ? "{}" : json;
+        SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        String nextSignature = pushRelevantSignature(next);
+        String previousSignature = prefs.getString(SIGNATURE, "");
+        prefs.edit().putString(CONFIG, next).putString(SIGNATURE, nextSignature).apply();
+        if (nextSignature.equals(previousSignature)) return;
         registerIfReady(context.getApplicationContext());
+    }
+
+    private static String pushRelevantSignature(String json) {
+        try {
+            JSONObject config = new JSONObject(json == null ? "{}" : json);
+            JSONObject bank = config.optJSONObject("bank");
+            JSONObject notifications = config.optJSONObject("notifications");
+            JSONArray known = config.optJSONArray("knownBankKeys");
+            JSONObject signature = new JSONObject()
+                    .put("bankApiUrl", config.optString("bankApiUrl", ""))
+                    .put("language", config.optString("language", "et"))
+                    .put("bank", bank == null ? new JSONObject() : new JSONObject()
+                            .put("installId", bank.optString("installId", ""))
+                            .put("handle", bank.optString("handle", "")))
+                    .put("notifications", notifications == null ? new JSONObject() : new JSONObject()
+                            .put("moneyReceived", notifications.optBoolean("moneyReceived", true))
+                            .put("moneySpent", notifications.optBoolean("moneySpent", true))
+                            .put("privacy", notifications.optString("privacy", "hideAmount")))
+                    .put("knownBankKeys", known == null ? new JSONArray() : known);
+            return signature.toString();
+        } catch (Exception ignored) {
+            return String.valueOf(json == null ? "{}" : json).hashCode() + "";
+        }
     }
 
     static void registerIfReady(Context context) {
@@ -69,11 +99,27 @@ final class PushRegistration {
                 body.put("known_bank_keys", known == null ? new JSONArray() : known);
 
                 postJson(api + "/api/push/register", body);
-            } catch (Exception ignored) {
+                prefs.edit().putString(LAST_ERROR, "").putLong(LAST_SUCCESS_AT, System.currentTimeMillis()).apply();
+            } catch (Exception error) {
+                context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                        .edit().putString(LAST_ERROR, String.valueOf(error.getMessage())).apply();
                 // Registration is best-effort and will be retried on the next FCM token refresh,
                 // app state update or bank sync.
             }
         });
+    }
+
+    static String diagnostics(Context context) {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        try {
+            return new JSONObject()
+                    .put("tokenPresent", !prefs.getString(TOKEN, "").isEmpty())
+                    .put("lastSuccessAt", prefs.getLong(LAST_SUCCESS_AT, 0L))
+                    .put("lastError", prefs.getString(LAST_ERROR, ""))
+                    .toString();
+        } catch (Exception ignored) {
+            return "{}";
+        }
     }
 
     private static JSONObject postJson(String url, JSONObject body) throws Exception {

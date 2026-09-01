@@ -382,6 +382,11 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
+        public String getPushDiagnostics() {
+            return PushRegistration.diagnostics(MainActivity.this);
+        }
+
+        @JavascriptInterface
         public void requestNotificationPermission() {
             runOnUiThread(() -> {
                 NotificationHelper.createChannels(MainActivity.this);
