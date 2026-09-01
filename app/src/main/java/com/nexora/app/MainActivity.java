@@ -32,6 +32,8 @@ import android.widget.Toast;
 
 import org.json.JSONObject;
 
+import com.google.firebase.messaging.FirebaseMessaging;
+
 import java.util.concurrent.Executor;
 
 public class MainActivity extends Activity {
@@ -58,6 +60,7 @@ public class MainActivity extends Activity {
 
         prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         NotificationHelper.createChannels(this);
+        FirebaseMessaging.getInstance().register();
         configureSystemBars();
         setupContent();
         setupWebView();
@@ -371,6 +374,7 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void updateNotificationConfig(String json) {
             BackgroundSyncJobService.saveConfig(MainActivity.this, json);
+            PushRegistration.updateConfig(MainActivity.this, json);
         }
 
         @JavascriptInterface

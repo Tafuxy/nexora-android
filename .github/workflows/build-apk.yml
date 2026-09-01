@@ -45,6 +45,21 @@ jobs:
           p.write_text(p.read_text().replace('__NEXORA_BANK_API_URL__', url))
           PY2
 
+
+      - name: Configure Firebase Android app
+        env:
+          FIREBASE_GOOGLE_SERVICES_JSON: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$FIREBASE_GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$FIREBASE_GOOGLE_SERVICES_JSON" > app/google-services.json
+          fi
+          if [ ! -f app/google-services.json ]; then
+            echo "Firebase config is missing."
+            echo "Put the Firebase-downloaded google-services.json into app/google-services.json or set FIREBASE_GOOGLE_SERVICES_JSON."
+            exit 1
+          fi
+          python3 -m json.tool app/google-services.json >/dev/null
+
       - name: Build APK
         run: gradle :app:assembleDebug --no-daemon
 

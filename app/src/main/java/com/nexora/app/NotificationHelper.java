@@ -63,6 +63,10 @@ final class NotificationHelper {
         notify(context, CHANNEL_REMINDERS, title, body, key.hashCode());
     }
 
+    static void showRemotePush(Context context, String title, String body, String key) {
+        notify(context, CHANNEL_BANK, title, body, (key == null ? "push" : key).hashCode());
+    }
+
     private static String join(String a, String b) {
         if (a == null) a = "";
         if (b == null) b = "";

@@ -1,5 +1,6 @@
 plugins {
     id 'com.android.application'
+    id 'com.google.gms.google-services'
 }
 
 android {
@@ -10,8 +11,8 @@ android {
         applicationId 'com.nexora.app'
         minSdk 28
         targetSdk 35
-        versionCode 14
-        versionName '1.7.0'
+        versionCode 16
+        versionName '1.8.0'
     }
 
     signingConfigs {
@@ -42,4 +43,6 @@ android {
 // Nexora's native shell is intentionally framework-light. The UI is bundled
 // locally in the WebView and Android's platform biometric APIs handle locking.
 dependencies {
+    implementation platform('com.google.firebase:firebase-bom:34.18.0')
+    implementation 'com.google.firebase:firebase-messaging'
 }

@@ -1,7 +1,21 @@
 name = "nexora-bank"
 main = "src.js"
-compatibility_date = "2026-08-31"
+compatibility_date = "2026-09-01"
 workers_dev = true
 
 [observability]
 enabled = true
+
+[durable_objects]
+bindings = [
+  { name = "PUSH_REGISTRY", class_name = "PushRegistry" }
+]
+
+[[migrations]]
+tag = "push-registry-v1"
+new_sqlite_classes = ["PushRegistry"]
+
+[triggers]
+# Many PSD2 banks allow only about four background AIS fetches per day.
+# Six-hour polling avoids deliberately bypassing ASPSP background rate limits.
+crons = ["0 */6 * * *"]

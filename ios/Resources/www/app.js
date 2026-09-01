@@ -1,7 +1,8 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const uid = () => crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-const todayISO = () => new Date().toISOString().slice(0, 10);
+const localISODate = (d = new Date()) => { const y=d.getFullYear(); const m=String(d.getMonth()+1).padStart(2,'0'); const day=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${day}`; };
+const todayISO = () => localISODate(new Date());
 const clone = (obj) => JSON.parse(JSON.stringify(obj));
 
 const icons = {
@@ -532,8 +533,8 @@ const cleanDefaults = {
   transactions: [],
   bills: [],
   vehicles: [],
-  bank: { installId: '', handle: '', connected: false, institutionId: '', accounts: [], lastSync: '', syncStatus: '', syncWarning: '' },
-  meta: { firstOpen: true, setupComplete: false, appVersion: '1.7.0' }
+  bank: { installId: '', handle: '', connected: false, institutionId: '', accounts: [], lastSync: '', syncStatus: '', syncWarning: '', lastTotalBalance: null },
+  meta: { firstOpen: true, setupComplete: false, appVersion: '1.7.1' }
 };
 
 const DEMO_TASKS = ['Review today’s priorities', 'Check upcoming car costs'];
@@ -617,7 +618,7 @@ function sanitizeState(input) {
   s.bank.accounts = Array.isArray(s.bank.accounts) ? s.bank.accounts : [];
   s.bank.installId = String(s.bank.installId || '');
   if (!s.bank.installId) s.bank.installId = `install-${uid()}`;
-  s.meta = { ...(s.meta || {}), appVersion: '1.7.0', firstOpen: Boolean(s.meta?.firstOpen), setupComplete: Boolean(s.meta?.setupComplete) };
+  s.meta = { ...(s.meta || {}), appVersion: '1.7.1', firstOpen: Boolean(s.meta?.firstOpen), setupComplete: Boolean(s.meta?.setupComplete) };
   return s;
 }
 
@@ -1304,6 +1305,7 @@ async function connectBank(institutionId) {
 
 function mergeBankTransactions(incoming) {
   const byKey = new Map(state.transactions.filter(tx => tx.bankKey).map(tx => [tx.bankKey, tx]));
+  const newlyAdded = [];
   for (const raw of incoming || []) {
     if (!raw.bank_key) continue;
     const existing = byKey.get(raw.bank_key);
@@ -1319,8 +1321,57 @@ function mergeBankTransactions(incoming) {
       source: 'bank',
       pending: Boolean(raw.pending)
     };
-    if (existing) Object.assign(existing, next); else state.transactions.push(next);
+    if (existing) Object.assign(existing, next); else { state.transactions.push(next); newlyAdded.push(next); }
   }
+  reconcileProvisionalBankDeltas(newlyAdded);
+  return newlyAdded;
+}
+
+function reconcileProvisionalBankDeltas(realTransactions) {
+  if (!Array.isArray(realTransactions) || !realTransactions.length) return;
+  const provisionals = state.transactions.filter(tx => tx.source === 'bank-provisional');
+  if (!provisionals.length) return;
+  const removeIds = new Set();
+  for (const real of realTransactions) {
+    const match = provisionals.find(p => {
+      if (removeIds.has(p.id) || p.type !== real.type) return false;
+      if (Math.abs(Number(p.amount || 0) - Number(real.amount || 0)) > 0.009) return false;
+      const pd = new Date(`${p.date}T12:00:00`), rd = new Date(`${real.date}T12:00:00`);
+      return Math.abs(pd - rd) <= 2 * 86400000;
+    });
+    if (match) removeIds.add(match.id);
+  }
+  if (removeIds.size) state.transactions = state.transactions.filter(tx => !removeIds.has(tx.id));
+}
+
+function totalBankBalance(accounts = state.bank.accounts) {
+  return (accounts || []).reduce((sum, acc) => sum + (Number.isFinite(Number(acc.balance)) ? Number(acc.balance) : 0), 0);
+}
+
+function addProvisionalBalanceDelta(oldTotal, newTotal, newRealTransactions, syncedAt) {
+  if (!Number.isFinite(oldTotal) || !Number.isFinite(newTotal)) return;
+  const balanceDelta = Math.round((newTotal - oldTotal) * 100) / 100;
+  if (Math.abs(balanceDelta) < 0.01) return;
+
+  const realNet = (newRealTransactions || []).reduce((sum, tx) => sum + (tx.type === 'income' ? Number(tx.amount || 0) : -Number(tx.amount || 0)), 0);
+  const residual = Math.round((balanceDelta - realNet) * 100) / 100;
+  if (Math.abs(residual) < 0.01) return;
+
+  const stamp = String(syncedAt || Date.now()).replace(/[^0-9A-Za-z]/g, '').slice(0, 32);
+  const bankKey = `balance-delta:${stamp}:${residual}`;
+  if (state.transactions.some(tx => tx.bankKey === bankKey)) return;
+  state.transactions.push({
+    id: uid(),
+    type: residual > 0 ? 'income' : 'expense',
+    amount: Math.abs(residual),
+    category: residual > 0 ? 'Income' : 'Other',
+    date: todayISO(),
+    note: lang() === 'et' ? 'Panga saldo muutus · tehingu detail ootel' : 'Bank balance changed · transaction details pending',
+    bankKey,
+    bankAccountId: '',
+    source: 'bank-provisional',
+    pending: true
+  });
 }
 
 function detectSalaryFromBank() {
@@ -1342,11 +1393,16 @@ async function syncBank(renderDuring = true) {
     });
     state.bank.connected = Boolean(data.connected);
     state.bank.syncStatus = data.status || '';
-    state.bank.accounts = Array.isArray(data.accounts) ? data.accounts : [];
+    const previousTotal = state.bank.lastTotalBalance !== null && state.bank.lastTotalBalance !== '' && Number.isFinite(Number(state.bank.lastTotalBalance)) ? Number(state.bank.lastTotalBalance) : (state.bank.lastSync ? totalBankBalance(state.bank.accounts) : NaN);
+    const nextAccounts = Array.isArray(data.accounts) ? data.accounts : [];
+    state.bank.accounts = nextAccounts;
     state.bank.institutionId = data.institution_id || state.bank.institutionId || '';
     state.bank.lastSync = data.synced_at || state.bank.lastSync || '';
     state.bank.syncWarning = Array.isArray(data.warnings) && data.warnings.length ? String(data.warnings[0]) : '';
-    mergeBankTransactions(data.transactions || []);
+    const newRealTransactions = mergeBankTransactions(data.transactions || []);
+    const nextTotal = totalBankBalance(nextAccounts);
+    addProvisionalBalanceDelta(previousTotal, nextTotal, newRealTransactions, data.synced_at || '');
+    state.bank.lastTotalBalance = nextTotal;
     detectSalaryFromBank();
     saveState(false);
     syncNativeNotificationConfig(false);
@@ -1614,7 +1670,7 @@ const views = {
       <section class="card brand-card">
         <img class="brand-wordmark dark-logo" src="nexora-wordmark-dark.png" alt="Nexora" />
         <img class="brand-wordmark light-logo" src="nexora-wordmark-light.png" alt="Nexora" />
-        <div class="brand-version">Nexora · 1.7.0</div>
+        <div class="brand-version">Nexora · 1.7.1</div>
       </section>
       <section class="card">
         <div class="section-title"><h3>${t('statistics')}</h3></div>

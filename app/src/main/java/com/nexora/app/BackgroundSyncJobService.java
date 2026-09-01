@@ -50,7 +50,7 @@ public class BackgroundSyncJobService extends JobService {
         ComponentName component = new ComponentName(context, BackgroundSyncJobService.class);
         JobInfo periodic = new JobInfo.Builder(PERIODIC_JOB, component)
                 .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
-                .setPeriodic(15 * 60 * 1000L)
+                .setPeriodic(6 * 60 * 60 * 1000L)
                 .setPersisted(true)
                 .build();
         scheduler.schedule(periodic);
@@ -84,7 +84,8 @@ public class BackgroundSyncJobService extends JobService {
         if (settings == null) settings = new JSONObject();
         String lang = config.optString("language", "et");
 
-        checkBank(config, settings, lang, prefs);
+        // Bank transaction push is handled server-side through FCM.
+        // Local background work is reserved for bills, vehicles and budget reminders.
         checkBills(config, settings, lang, prefs);
         checkVehicles(config, settings, lang, prefs);
         checkBudget(config, settings, lang, prefs);
