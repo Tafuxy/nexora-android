@@ -55,6 +55,7 @@ final class PushRegistration {
             JSONObject bank = config.optJSONObject("bank");
             JSONObject notifications = config.optJSONObject("notifications");
             JSONArray known = config.optJSONArray("knownBankKeys");
+            JSONArray ownIbans = config.optJSONArray("ownAccountIbans");
             JSONObject signature = new JSONObject()
                     .put("bankApiUrl", config.optString("bankApiUrl", ""))
                     .put("language", config.optString("language", "et"))
@@ -65,7 +66,8 @@ final class PushRegistration {
                             .put("moneyReceived", notifications.optBoolean("moneyReceived", true))
                             .put("moneySpent", notifications.optBoolean("moneySpent", true))
                             .put("privacy", notifications.optString("privacy", "hideAmount")))
-                    .put("knownBankKeys", known == null ? new JSONArray() : known);
+                    .put("knownBankKeys", known == null ? new JSONArray() : known)
+                    .put("ownAccountIbans", ownIbans == null ? new JSONArray() : ownIbans);
             return signature.toString();
         } catch (Exception ignored) {
             return String.valueOf(json == null ? "{}" : json).hashCode() + "";
@@ -97,6 +99,8 @@ final class PushRegistration {
                 body.put("notifications", notifications == null ? new JSONObject() : notifications);
                 JSONArray known = config.optJSONArray("knownBankKeys");
                 body.put("known_bank_keys", known == null ? new JSONArray() : known);
+                JSONArray ownIbans = config.optJSONArray("ownAccountIbans");
+                body.put("own_account_ibans", ownIbans == null ? new JSONArray() : ownIbans);
 
                 postJson(api + "/api/push/register", body);
                 prefs.edit().putString(LAST_ERROR, "").putLong(LAST_SUCCESS_AT, System.currentTimeMillis()).apply();

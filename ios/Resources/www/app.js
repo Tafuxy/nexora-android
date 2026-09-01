@@ -66,6 +66,38 @@ const translations = {
     topCategories: 'Peamised kategooriad',
     noTransactions: 'Tehinguid pole veel.',
     recentTransactions: 'Viimased tehingud',
+    searchTransactions: 'Otsi tehinguid',
+    searchTransactionsHint: 'Otsi nime, summa, konto või viite järgi',
+    transactionDetails: 'Tehingu üksikasjad',
+    transactionAmount: 'Summa',
+    transactionType: 'Liik',
+    transactionAccount: 'Konto',
+    transactionCounterparty: 'Vastaspool',
+    transactionPayer: 'Maksja',
+    transactionRecipient: 'Saaja',
+    transactionPayerIban: 'Maksja IBAN',
+    transactionRecipientIban: 'Saaja IBAN',
+    transactionCounterpartyIban: 'Vastaspoole IBAN',
+    transactionDescription: 'Kirjeldus',
+    transactionReference: 'Viitenumber',
+    transactionReferenceScheme: 'Viite skeem',
+    transactionDate: 'Tehingu kuupäev',
+    bookingDate: 'Broneerimise kuupäev',
+    valueDate: 'Väärtuspäev',
+    transactionStatus: 'Staatus',
+    transactionCurrency: 'Valuuta',
+    transactionBankCode: 'Panga tehingukood',
+    transactionDebtorAgent: 'Maksja pank',
+    transactionCreditorAgent: 'Saaja pank',
+    transactionBankNote: 'Panga märkus',
+    transactionEntryReference: 'Arhiivi / kande ID',
+    transactionId: 'Tehingu ID',
+    transactionMcc: 'MCC',
+    balanceAfterTransaction: 'Saldo pärast tehingut',
+    transactionExchangeRate: 'Valuutakurss',
+    incomeLabel: 'Laekumine',
+    expenseLabel: 'Väljaminek',
+    noSearchResults: 'Selliseid tehinguid ei leitud.',
     yourVehicles: 'Sinu autod',
     noVehicles: 'Autosid pole veel lisatud.',
     noVehiclesHelp: 'Lisa esimene auto ja hakka jälgima hooldusi, kindlustust ja autokulusid.',
@@ -90,6 +122,11 @@ const translations = {
     newTask: 'Uus ülesanne',
     task: 'Ülesanne',
     whatNeedsDoing: 'Mis on vaja ära teha?',
+    repeat: 'Korda',
+    repeatNone: 'Ei korda',
+    repeatDaily: 'Iga päev',
+    repeatWeekly: 'Iga nädal samal nädalapäeval',
+    repeatMonthly: 'Iga kuu samal kuupäeval',
     date: 'Kuupäev',
     time: 'Kellaaeg',
     category: 'Kategooria',
@@ -250,6 +287,38 @@ const translations = {
     topCategories: 'Top categories',
     noTransactions: 'No transactions yet.',
     recentTransactions: 'Recent transactions',
+    searchTransactions: 'Search transactions',
+    searchTransactionsHint: 'Search by name, amount, account or reference',
+    transactionDetails: 'Transaction details',
+    transactionAmount: 'Amount',
+    transactionType: 'Type',
+    transactionAccount: 'Account',
+    transactionCounterparty: 'Counterparty',
+    transactionPayer: 'Payer',
+    transactionRecipient: 'Recipient',
+    transactionPayerIban: 'Payer IBAN',
+    transactionRecipientIban: 'Recipient IBAN',
+    transactionCounterpartyIban: 'Counterparty IBAN',
+    transactionDescription: 'Description',
+    transactionReference: 'Reference',
+    transactionReferenceScheme: 'Reference scheme',
+    transactionDate: 'Transaction date',
+    bookingDate: 'Booking date',
+    valueDate: 'Value date',
+    transactionStatus: 'Status',
+    transactionCurrency: 'Currency',
+    transactionBankCode: 'Bank transaction code',
+    transactionDebtorAgent: 'Payer bank',
+    transactionCreditorAgent: 'Recipient bank',
+    transactionBankNote: 'Bank note',
+    transactionEntryReference: 'Entry reference',
+    transactionId: 'Transaction ID',
+    transactionMcc: 'MCC',
+    balanceAfterTransaction: 'Balance after transaction',
+    transactionExchangeRate: 'Exchange rate',
+    incomeLabel: 'Money in',
+    expenseLabel: 'Money out',
+    noSearchResults: 'No matching transactions found.',
     yourVehicles: 'Your vehicles',
     noVehicles: 'No vehicles added yet.',
     noVehiclesHelp: 'Add your first vehicle and start tracking service, insurance and car costs.',
@@ -274,6 +343,11 @@ const translations = {
     newTask: 'New task',
     task: 'Task',
     whatNeedsDoing: 'What needs doing?',
+    repeat: 'Repeat',
+    repeatNone: 'Does not repeat',
+    repeatDaily: 'Every day',
+    repeatWeekly: 'Every week on the same weekday',
+    repeatMonthly: 'Every month on the same date',
     date: 'Date',
     time: 'Time',
     category: 'Category',
@@ -527,14 +601,14 @@ function o(key) {
 }
 
 const cleanDefaults = {
-  settings: { language: '', interests: [], requireAuth: true, biometricEnabled: false, notifications: { moneyReceived: true, moneySpent: true, bills: true, vehicles: true, budget: true, privacy: 'hideAmount' } },
+  settings: { language: '', interests: [], ownAccountIbans: [], requireAuth: true, biometricEnabled: false, notifications: { moneyReceived: true, moneySpent: true, bills: true, vehicles: true, budget: true, privacy: 'hideAmount' } },
   profile: { name: '', monthlyBudget: 0, monthlyIncome: 0, savingsGoal: 0, savingsCurrent: 0 },
   tasks: [],
   transactions: [],
   bills: [],
   vehicles: [],
   bank: { installId: '', handle: '', connected: false, institutionId: '', accounts: [], lastGoodAccounts: [], lastSync: '', syncStatus: '', syncWarning: '', reauthorizationRequired: false, lastTotalBalance: null },
-  meta: { firstOpen: true, setupComplete: false, appVersion: '1.8.4' }
+  meta: { firstOpen: true, setupComplete: false, appVersion: '1.8.8' }
 };
 
 const DEMO_TASKS = ['Review today’s priorities', 'Check upcoming car costs'];
@@ -600,7 +674,7 @@ function sanitizeState(input) {
   s.profile.monthlyIncome = Number(s.profile.monthlyIncome || 0);
   s.profile.savingsGoal = Number(s.profile.savingsGoal || 0);
   s.profile.savingsCurrent = Number(s.profile.savingsCurrent || 0);
-  s.tasks = Array.isArray(s.tasks) ? s.tasks : [];
+  s.tasks = Array.isArray(s.tasks) ? s.tasks.map(task => ({ ...task, repeat: ['daily','weekly','monthly'].includes(task?.repeat) ? task.repeat : 'none' })) : [];
   s.transactions = Array.isArray(s.transactions) ? s.transactions : [];
   // Never infer real income/expenses from a temporary balance change. Older builds did
   // this and could create false spending when a bank sync briefly failed.
@@ -610,6 +684,7 @@ function sanitizeState(input) {
   s.settings.interests = Array.isArray(s.settings?.interests) ? s.settings.interests : [];
   s.settings.requireAuth = true;
   s.settings.biometricEnabled = Boolean(s.settings?.biometricEnabled);
+  s.settings.ownAccountIbans = Array.isArray(s.settings?.ownAccountIbans) ? [...new Set(s.settings.ownAccountIbans.map(normalizedIban).filter(iban => /^[A-Z]{2}[A-Z0-9]{13,32}$/.test(iban)))] : [];
   s.settings.notifications = deepMerge(cleanDefaults.settings.notifications, s.settings?.notifications || {});
   s.settings.notifications.moneyReceived = s.settings.notifications.moneyReceived !== false;
   s.settings.notifications.moneySpent = s.settings.notifications.moneySpent !== false;
@@ -624,7 +699,7 @@ function sanitizeState(input) {
   s.bank.lastGoodAccounts = Array.isArray(s.bank.lastGoodAccounts) ? s.bank.lastGoodAccounts : [];
   s.bank.installId = String(s.bank.installId || '');
   if (!s.bank.installId) s.bank.installId = `install-${uid()}`;
-  s.meta = { ...(s.meta || {}), appVersion: '1.8.4', firstOpen: Boolean(s.meta?.firstOpen), setupComplete: Boolean(s.meta?.setupComplete) };
+  s.meta = { ...(s.meta || {}), appVersion: '1.8.8', firstOpen: Boolean(s.meta?.firstOpen), setupComplete: Boolean(s.meta?.setupComplete) };
   return s;
 }
 
@@ -640,6 +715,7 @@ function notificationConfigPayload() {
       connected: Boolean(state.bank.connected)
     },
     knownBankKeys,
+    ownAccountIbans: ownAccountIbans(),
     notifications: {
       moneyReceived: notifications.moneyReceived !== false,
       moneySpent: notifications.moneySpent !== false,
@@ -1028,12 +1104,19 @@ function normalizedIban(value) {
   return String(value || '').replace(/\s+/g, '').toUpperCase();
 }
 
+function ownAccountIbans() {
+  const connected = [...(state.bank.accounts || []), ...(state.bank.lastGoodAccounts || [])]
+    .map(account => normalizedIban(account?.iban))
+    .filter(Boolean);
+  const manual = (state.settings?.ownAccountIbans || []).map(normalizedIban).filter(Boolean);
+  return [...new Set([...connected, ...manual])];
+}
+
 function isInternalBankTransfer(tx) {
   if (!tx || tx.source !== 'bank') return false;
-  const counterpart = normalizedIban(tx.counterpartyIban);
+  const counterpart = normalizedIban(tx.counterpartyIban || tx.bankDetails?.counterparty_iban);
   if (!counterpart) return false;
-  return (state.bank.accounts || state.bank.lastGoodAccounts || [])
-    .some(account => normalizedIban(account?.iban) === counterpart);
+  return ownAccountIbans().includes(counterpart);
 }
 
 function monthTransactions() {
@@ -1060,6 +1143,42 @@ function garageSpend() {
   return monthTransactions().filter(t => ['Fuel', 'Maintenance', 'Car', 'Insurance'].includes(t.category)).reduce((a, t) => a + Number(t.amount || 0), 0);
 }
 
+function taskRepeatLabel(repeat) {
+  if (repeat === 'daily') return t('repeatDaily');
+  if (repeat === 'weekly') return t('repeatWeekly');
+  if (repeat === 'monthly') return t('repeatMonthly');
+  return '';
+}
+
+function nextTaskOccurrence(dateStr, repeat) {
+  if (!dateStr || !['daily','weekly','monthly'].includes(repeat)) return dateStr;
+  const [y,m,d] = String(dateStr).slice(0,10).split('-').map(Number);
+  const date = new Date(y, (m || 1) - 1, d || 1, 12, 0, 0, 0);
+  if (repeat === 'daily') date.setDate(date.getDate() + 1);
+  if (repeat === 'weekly') date.setDate(date.getDate() + 7);
+  if (repeat === 'monthly') {
+    const originalDay = date.getDate();
+    date.setDate(1);
+    date.setMonth(date.getMonth() + 1);
+    const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+    date.setDate(Math.min(originalDay, lastDay));
+  }
+  return localISODate(date);
+}
+
+function advanceRecurringTask(task) {
+  if (!task || !['daily','weekly','monthly'].includes(task.repeat)) return false;
+  const today = todayISO();
+  let next = nextTaskOccurrence(task.date || today, task.repeat);
+  // If an old recurring task was left overdue for a long time, advance it to the next
+  // useful occurrence instead of forcing the user to complete every missed instance.
+  while (next && next <= today) next = nextTaskOccurrence(next, task.repeat);
+  task.date = next || today;
+  task.done = false;
+  task.lastCompletedAt = new Date().toISOString();
+  return true;
+}
+
 function upcomingTasks(limit = 4) {
   return state.tasks
     .filter(t => !t.done)
@@ -1080,10 +1199,10 @@ function monthlyBillsTotal() { return state.bills.filter(b => b.active !== false
 function billPaidThisMonth(bill) { return Boolean(billPaymentForMonth(bill)); }
 function paidBillsThisMonth() { return state.bills.filter(billPaidThisMonth).reduce((sum, bill) => sum + Number(bill.amount || 0), 0); }
 function unpaidBillsThisMonth() { return Math.max(0, monthlyBillsTotal() - paidBillsThisMonth()); }
-function lifetimeIncome() { return state.transactions.filter(tx => tx.type === 'income').reduce((sum, tx) => sum + Number(tx.amount || 0), 0); }
-function lifetimeSpend() { return state.transactions.filter(tx => tx.type === 'expense').reduce((sum, tx) => sum + Number(tx.amount || 0), 0); }
-function lifetimeBills() { return state.transactions.filter(tx => tx.type === 'expense' && (tx.category === 'Bills' || tx.billId)).reduce((sum, tx) => sum + Number(tx.amount || 0), 0); }
-function lifetimeGarage() { return state.transactions.filter(tx => tx.type === 'expense' && ['Fuel','Maintenance','Car','Insurance'].includes(tx.category)).reduce((sum, tx) => sum + Number(tx.amount || 0), 0); }
+function lifetimeIncome() { return state.transactions.filter(tx => tx.type === 'income' && !tx.pending && !isInternalBankTransfer(tx)).reduce((sum, tx) => sum + Number(tx.amount || 0), 0); }
+function lifetimeSpend() { return state.transactions.filter(tx => tx.type === 'expense' && !tx.pending && !isInternalBankTransfer(tx)).reduce((sum, tx) => sum + Number(tx.amount || 0), 0); }
+function lifetimeBills() { return state.transactions.filter(tx => tx.type === 'expense' && !tx.pending && !isInternalBankTransfer(tx) && (tx.category === 'Bills' || tx.billId)).reduce((sum, tx) => sum + Number(tx.amount || 0), 0); }
+function lifetimeGarage() { return state.transactions.filter(tx => tx.type === 'expense' && !tx.pending && !isInternalBankTransfer(tx) && ['Fuel','Maintenance','Car','Insurance'].includes(tx.category)).reduce((sum, tx) => sum + Number(tx.amount || 0), 0); }
 function dueDayLabel(day) { return `${f('due')} ${Math.max(1, Math.min(31, Number(day || 1)))}.`; }
 
 function billPaymentForMonth(bill, month = currentMonthKey()) {
@@ -1346,7 +1465,10 @@ function mergeBankTransactions(incoming) {
       bankKey: raw.bank_key,
       bankAccountId: raw.account_id || '',
       counterpartyIban: raw.counterparty_iban || existing?.counterpartyIban || '',
+      counterpartyName: raw.counterparty_name || existing?.counterpartyName || raw.merchant || '',
+      currency: raw.currency || existing?.currency || 'EUR',
       bankStatus: raw.status || existing?.bankStatus || '',
+      bankDetails: raw.details || existing?.bankDetails || {},
       source: 'bank',
       pending: Boolean(raw.pending)
     };
@@ -1511,6 +1633,50 @@ function homeQuickActions(firstVehicle) {
   }).join('');
 }
 
+
+function internalTransferText(key) {
+  const et = {
+    label: 'Sisemine ülekanne', ownAccounts: 'Minu kontod', connectedDetected: 'Tuvastatud oma kontosid',
+    hint: 'Lisa siia oma kogumis-, investeerimis- või muu konto IBAN. Nende kontode vahelisi liikumisi ei loeta tuluks ega kuluks.',
+    addIban: 'Lisa konto IBAN', ibanPlaceholder: 'EE00 0000 0000 0000 0000',
+    noManual: 'Käsitsi lisatud kontosid pole.', invalidIban: 'Kontrolli IBAN-i kuju.', remove: 'Eemalda', save: 'Salvesta'
+  };
+  const en = {
+    label: 'Internal transfer', ownAccounts: 'My accounts', connectedDetected: 'Own accounts detected',
+    hint: 'Add your savings, investment or other account IBAN. Transfers between your own accounts are excluded from income and spending.',
+    addIban: 'Add account IBAN', ibanPlaceholder: 'EE00 0000 0000 0000 0000',
+    noManual: 'No manually added accounts.', invalidIban: 'Check the IBAN format.', remove: 'Remove', save: 'Save'
+  };
+  return (lang() === 'et' ? et : en)[key] || key;
+}
+
+function maskedIban(value) {
+  const iban = normalizedIban(value);
+  if (iban.length < 8) return iban;
+  return `${iban.slice(0,4)}••••••••${iban.slice(-4)}`;
+}
+
+function openOwnAccountsSettings() {
+  const manual = [...(state.settings.ownAccountIbans || [])];
+  const listHtml = manual.length ? manual.map((iban, index) => `<div class="row"><div class="row-main"><div class="row-title tx-detail-mono">${esc(maskedIban(iban))}</div><div class="row-sub">${internalTransferText('label')}</div></div><button type="button" class="delete-btn" data-remove-own-iban="${index}" aria-label="${internalTransferText('remove')}">×</button></div>`).join('') : `<div class="empty">${internalTransferText('noManual')}</div>`;
+  showModal(`<h2>${internalTransferText('ownAccounts')}</h2><div class="small muted" style="margin-bottom:14px">${internalTransferText('hint')}</div><div class="list">${listHtml}</div><form class="form" id="ownIbanForm" style="margin-top:14px"><div class="field"><label>${internalTransferText('addIban')}</label><input name="iban" inputmode="text" autocomplete="off" placeholder="${internalTransferText('ibanPlaceholder')}"></div><div class="modal-actions"><button type="button" class="ghost" data-close>${t('close')}</button><button class="primary" type="submit">${internalTransferText('save')}</button></div></form>`);
+  $('[data-close]')?.addEventListener('click', closeModal);
+  $$('[data-remove-own-iban]').forEach(btn => btn.addEventListener('click', () => {
+    const index = Number(btn.dataset.removeOwnIban);
+    state.settings.ownAccountIbans.splice(index, 1);
+    saveState(false);
+    openOwnAccountsSettings();
+  }));
+  $('#ownIbanForm').onsubmit = e => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const iban = normalizedIban(f.get('iban'));
+    if (!/^[A-Z]{2}[A-Z0-9]{13,32}$/.test(iban)) { alert(internalTransferText('invalidIban')); return; }
+    if (!state.settings.ownAccountIbans.includes(iban)) state.settings.ownAccountIbans.push(iban);
+    saveState(false);
+    openOwnAccountsSettings();
+  };
+}
 
 function notificationText(key) {
   const et = {
@@ -1683,7 +1849,7 @@ const views = {
   money() {
     const f = financeStatus();
     const cats = categoryTotals();
-    const recent = state.transactions.slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))).slice(0, 8);
+    const recent = state.transactions.slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
     const limitPct = f.limit ? Math.min(100, (f.spend / f.limit) * 100) : 0;
     const statusBad = f.cashLeft < 0 || (f.limit && f.limitLeft < 0);
     const next = nextBillDue();
@@ -1727,8 +1893,14 @@ const views = {
 
       ${next ? `<section class="card soft"><div class="section-title"><h3>${t('nextBill')}</h3><button class="ghost" data-go="bills">${t('seeAll')}</button></div><div class="bill-mini"><div><b>${esc(next.name)}</b><span>${t('dueOn')} ${Number(next.dueDay || 1)}.</span></div><strong>${money(next.amount)}</strong></div></section>` : ''}
 
-      <div class="section-title"><h3>${t('recentTransactions')}</h3></div>
-      <section class="card"><div class="list">${recent.length ? recent.map(txRow).join('') : `<div class="empty">${t('noTransactions')}</div>`}</div></section>
+      <div class="section-title"><h3>${t('recentTransactions')}</h3><span class="pill">${recent.length}</span></div>
+      <section class="card transaction-history-card">
+        <div class="transaction-search-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="transactionSearch" class="transaction-search" inputmode="search" autocomplete="off" placeholder="${t('searchTransactionsHint')}" aria-label="${t('searchTransactions')}">
+        </div>
+        <div id="transactionList" class="list transaction-list-scroll">${recent.length ? recent.map(txRow).join('') : `<div class="empty">${t('noTransactions')}</div>`}</div>
+      </section>
       <button class="fab" data-add="transaction" aria-label="${t('addExpense')}">+</button>
     </div>`;
   },
@@ -1775,7 +1947,7 @@ const views = {
       <section class="card brand-card">
         <img class="brand-wordmark dark-logo" src="nexora-wordmark-dark.png" alt="Nexora" />
         <img class="brand-wordmark light-logo" src="nexora-wordmark-light.png" alt="Nexora" />
-        <div class="brand-version">Nexora · 1.8.5</div>
+        <div class="brand-version">Nexora · 1.8.8</div>
       </section>
       <section class="card">
         <div class="section-title"><h3>${t('statistics')}</h3></div>
@@ -1800,6 +1972,11 @@ const views = {
         <div class="section-title"><h3>${t('appSettings')}</h3><button class="ghost" data-open-settings>${t('configure')}</button></div>
         <div class="statline"><span>${t('language')}</span><strong>${currentLangLabel}</strong></div>
         <div class="statline"><span>${t('themeLabel')}</span><strong>${themeLabel}</strong></div>
+      </section>
+      <section class="card">
+        <div class="section-title"><h3>${internalTransferText('ownAccounts')}</h3><button class="ghost" data-own-accounts>${t('configure')}</button></div>
+        <div class="statline"><span>${internalTransferText('connectedDetected')}</span><strong>${ownAccountIbans().length}</strong></div>
+        <div class="row-sub" style="white-space:normal;margin-top:6px">${internalTransferText('hint')}</div>
       </section>
       <section class="card">
         <div class="section-title"><h3>${notificationText('title')}</h3><button class="ghost" data-open-notifications>${notificationText('configure')}</button></div>
@@ -1840,22 +2017,99 @@ function taskRow(item) {
       <button class="task-check ${item.done ? 'checked' : ''}" data-toggle-task="${item.id}" aria-label="toggle">${icons.check}</button>
       <div class="row-main">
         <div class="row-title">${esc(item.title)}</div>
-        <div class="row-sub">${item.date ? (item.date === todayISO() ? t('today') : fmtDate(item.date)) : ''}${item.time ? ` · ${esc(item.time)}` : ''}${item.category ? ` · ${esc(categoryLabel(item.category))}` : ''}</div>
+        <div class="row-sub">${item.date ? (item.date === todayISO() ? t('today') : fmtDate(item.date)) : ''}${item.time ? ` · ${esc(item.time)}` : ''}${item.category ? ` · ${esc(categoryLabel(item.category))}` : ''}${item.repeat && item.repeat !== 'none' ? ` · ↻ ${esc(taskRepeatLabel(item.repeat))}` : ''}</div>
       </div>
       <button class="delete-btn" data-delete-task="${item.id}" aria-label="delete">×</button>
     </div>`;
 }
 
 function txRow(item) {
-  return `<div class="row transaction-row">
-      <span class="dot ${item.type === 'income' ? 'good' : 'bad'}"></span>
+  const account = (state.bank.accounts || []).find(a => String(a.id || '') === String(item.bankAccountId || ''));
+  const accountName = account ? bankAccountDisplayName(account) : '';
+  const internal = isInternalBankTransfer(item);
+  const typeLabel = internal ? internalTransferText('label') : categoryLabel(item.category || 'Other');
+  const amountClass = internal ? '' : (item.type === 'income' ? 'money-pos' : 'money-neg');
+  const sign = internal ? '↔ ' : (item.type === 'income' ? '+' : '−');
+  return `<div class="row transaction-row transaction-open ${internal ? 'internal-transfer-row' : ''}" data-open-tx="${item.id}" role="button" tabindex="0" aria-label="${esc(t('transactionDetails'))}">
+      <span class="dot ${internal ? 'internal' : (item.type === 'income' ? 'good' : 'bad')}"></span>
       <div class="row-main">
-        <div class="row-title">${esc(item.note || categoryLabel(item.category || 'Other'))}</div>
-        <div class="row-sub">${esc(categoryLabel(item.category || 'Other'))} · ${fmtDate(item.date)}</div>
+        <div class="row-title">${esc(item.note || item.counterpartyName || categoryLabel(item.category || 'Other'))}</div>
+        <div class="row-sub">${esc([typeLabel, accountName, fmtDate(item.date)].filter(Boolean).join(' · '))}</div>
       </div>
-      <strong class="transaction-amount ${item.type === 'income' ? 'money-pos' : 'money-neg'}">${item.type === 'income' ? '+' : '−'}${money(item.amount)}</strong>
-      <button class="delete-btn transaction-delete" data-delete-tx="${item.id}" aria-label="delete">×</button>
+      <strong class="transaction-amount ${amountClass}">${sign}${money(item.amount)}</strong>
+      ${item.source === 'bank' ? '<span class="transaction-chevron">›</span>' : `<button class="delete-btn transaction-delete" data-delete-tx="${item.id}" aria-label="delete">×</button>`}
     </div>`;
+}
+
+function transactionSearchText(item) {
+  const account = (state.bank.accounts || []).find(a => String(a.id || '') === String(item.bankAccountId || ''));
+  const d = item.bankDetails || {};
+  return [
+    item.note, item.counterpartyName, item.counterpartyIban, item.category,
+    item.amount, String(item.amount || '').replace('.', ','), money(item.amount),
+    account ? bankAccountDisplayName(account) : '', account?.iban,
+    d.reference_number, d.remittance_information, d.entry_reference, d.transaction_id,
+    d.bank_transaction_code, d.debtor_name, d.creditor_name, d.debtor_iban, d.creditor_iban
+  ].filter(Boolean).join(' ').toLocaleLowerCase(locale());
+}
+
+function filterTransactions(query) {
+  const q = String(query || '').trim().toLocaleLowerCase(locale());
+  const sorted = state.transactions.slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+  if (!q) return sorted;
+  return sorted.filter(item => transactionSearchText(item).includes(q));
+}
+
+function transactionDetailRow(label, value, opts = {}) {
+  if (value === undefined || value === null || String(value).trim() === '') return '';
+  return `<div class="tx-detail-row"><span>${esc(label)}</span><strong class="${opts.mono ? 'tx-detail-mono' : ''}">${esc(String(value))}</strong></div>`;
+}
+
+function formatBankStatus(status) {
+  const key = String(status || '').toUpperCase();
+  if (lang() === 'et') return ({BOOK:'Teostatud',ACCC:'Teostatud',ACSC:'Teostatud',PDNG:'Ootel',PENDING:'Ootel',RJCT:'Tagasi lükatud'}[key] || status || '—');
+  return ({BOOK:'Booked',ACCC:'Completed',ACSC:'Completed',PDNG:'Pending',PENDING:'Pending',RJCT:'Rejected'}[key] || status || '—');
+}
+
+function openTransactionDetails(id) {
+  const item = state.transactions.find(tx => String(tx.id) === String(id));
+  if (!item) return;
+  const d = item.bankDetails || {};
+  const account = (state.bank.accounts || []).find(a => String(a.id || '') === String(item.bankAccountId || ''));
+  const accountText = account ? [bankAccountDisplayName(account), bankAccountMeta(account)].filter(Boolean).join(' · ') : '';
+  const counterparty = item.counterpartyName || d.counterparty_name || d.debtor_name || d.creditor_name || item.note || '';
+  const internal = isInternalBankTransfer(item);
+  const amountClass = internal ? '' : (item.type === 'income' ? 'money-pos' : 'money-neg');
+  const sign = internal ? '↔ ' : (item.type === 'income' ? '+' : '−');
+  const rows = [
+    transactionDetailRow(t('transactionType'), internal ? internalTransferText('label') : (item.type === 'income' ? t('incomeLabel') : t('expenseLabel'))),
+    transactionDetailRow(t('transactionAccount'), accountText),
+    transactionDetailRow(t('transactionCounterparty'), counterparty),
+    transactionDetailRow(t('transactionCounterpartyIban'), item.counterpartyIban || d.counterparty_iban, {mono:true}),
+    transactionDetailRow(t('transactionPayer'), d.debtor_name),
+    transactionDetailRow(t('transactionPayerIban'), d.debtor_iban, {mono:true}),
+    transactionDetailRow(t('transactionRecipient'), d.creditor_name),
+    transactionDetailRow(t('transactionRecipientIban'), d.creditor_iban, {mono:true}),
+    transactionDetailRow(t('transactionDescription'), d.remittance_information || d.note || item.note),
+    transactionDetailRow(t('transactionReference'), d.reference_number, {mono:true}),
+    transactionDetailRow(t('transactionReferenceScheme'), d.reference_number_schema),
+    transactionDetailRow(t('transactionDate'), d.transaction_date || item.date),
+    transactionDetailRow(t('bookingDate'), d.booking_date),
+    transactionDetailRow(t('valueDate'), d.value_date),
+    transactionDetailRow(t('transactionStatus'), formatBankStatus(item.bankStatus || d.status)),
+    transactionDetailRow(t('transactionCurrency'), item.currency || d.currency || 'EUR'),
+    transactionDetailRow(t('transactionBankCode'), d.bank_transaction_code),
+    transactionDetailRow(t('transactionDebtorAgent'), d.debtor_agent),
+    transactionDetailRow(t('transactionCreditorAgent'), d.creditor_agent),
+    transactionDetailRow(t('transactionBankNote'), d.note),
+    transactionDetailRow(t('transactionMcc'), d.merchant_category_code),
+    transactionDetailRow(t('balanceAfterTransaction'), d.balance_after_transaction),
+    transactionDetailRow(t('transactionExchangeRate'), d.exchange_rate),
+    transactionDetailRow(t('transactionEntryReference'), d.entry_reference, {mono:true}),
+    transactionDetailRow(t('transactionId'), d.transaction_id, {mono:true})
+  ].join('');
+  showModal(`<div class="tx-detail-head"><div><div class="tiny muted">${esc(t('transactionDetails'))}</div><h2>${esc(counterparty || categoryLabel(item.category || 'Other'))}</h2></div><div class="tx-detail-amount ${amountClass}">${sign}${money(item.amount)}</div></div><div class="tx-detail-list">${rows || `<div class="empty">${t('noDataYet')}</div>`}</div><div class="modal-actions tx-detail-actions"><button type="button" class="primary" data-close>${t('close')}</button></div>`);
+  $('[data-close]')?.addEventListener('click', closeModal);
 }
 
 function billCard(bill) {
@@ -1929,13 +2183,37 @@ function insights() {
   return list.slice(0, 3);
 }
 
+function bindTransactionRows() {
+  $$('[data-open-tx]').forEach(row => {
+    row.onclick = e => {
+      if (e.target.closest('[data-delete-tx]')) return;
+      openTransactionDetails(row.dataset.openTx);
+    };
+    row.onkeydown = e => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openTransactionDetails(row.dataset.openTx);
+      }
+    };
+  });
+  $$('[data-delete-tx]').forEach(btn => btn.onclick = e => {
+    e.stopPropagation();
+    state.transactions = state.transactions.filter(x => x.id !== btn.dataset.deleteTx);
+    saveState();
+  });
+}
+
 function bindView() {
   $$('[data-go]').forEach(btn => btn.onclick = () => $(`.nav-item[data-view="${btn.dataset.go}"]`)?.click());
   $$('[data-add]').forEach(btn => btn.onclick = () => openAdd(btn.dataset.add));
   $$('[data-toggle-task]').forEach(btn => btn.onclick = () => {
     const item = state.tasks.find(x => x.id === btn.dataset.toggleTask);
     if (item) {
-      item.done = !item.done;
+      if (item.repeat && item.repeat !== 'none' && !item.done) {
+        advanceRecurringTask(item);
+      } else {
+        item.done = !item.done;
+      }
       state.meta.firstOpen = false;
       saveState();
     }
@@ -1944,7 +2222,18 @@ function bindView() {
     state.tasks = state.tasks.filter(x => x.id !== btn.dataset.deleteTask);
     saveState();
   });
-  $$('[data-delete-tx]').forEach(btn => btn.onclick = () => {
+  const txSearch = $('#transactionSearch');
+  if (txSearch) {
+    txSearch.addEventListener('input', () => {
+      const matches = filterTransactions(txSearch.value);
+      const list = $('#transactionList');
+      if (list) list.innerHTML = matches.length ? matches.map(txRow).join('') : `<div class="empty">${t('noSearchResults')}</div>`;
+      bindTransactionRows();
+    });
+  }
+  bindTransactionRows();
+  $$('[data-delete-tx]').forEach(btn => btn.onclick = e => {
+    e.stopPropagation();
     state.transactions = state.transactions.filter(x => x.id !== btn.dataset.deleteTx);
     saveState();
   });
@@ -1965,6 +2254,7 @@ function bindView() {
   $('[data-edit-profile]')?.addEventListener('click', openProfile);
   $('[data-open-settings]')?.addEventListener('click', openSettings);
   $('[data-open-notifications]')?.addEventListener('click', openNotificationSettings);
+  $('[data-own-accounts]')?.addEventListener('click', openOwnAccountsSettings);
   $('[data-export]')?.addEventListener('click', exportData);
   $('[data-reset]')?.addEventListener('click', resetData);
   $('[data-connect-bank]')?.addEventListener('click', openBankPicker);
@@ -2022,11 +2312,12 @@ function openAdd(type) {
       <div class="field"><label>${t('task')}</label><input name="title" required placeholder="${t('whatNeedsDoing')}"></div>
       <div class="grid-2"><div class="field"><label>${t('date')}</label><input name="date" type="date" value="${todayISO()}" required></div><div class="field"><label>${t('time')}</label><input name="time" type="time"></div></div>
       <div class="field"><label>${t('category')}</label><select name="category"><option value="Personal">${t('personal')}</option><option value="Work">${t('work')}</option><option value="Garage">${categoryLabel('Garage')}</option><option value="Money">${categoryLabel('Money')}</option><option value="Other">${t('other')}</option></select></div>
+      <div class="field"><label>${t('repeat')}</label><select name="repeat"><option value="none">${t('repeatNone')}</option><option value="daily">${t('repeatDaily')}</option><option value="weekly">${t('repeatWeekly')}</option><option value="monthly">${t('repeatMonthly')}</option></select></div>
     `));
     $('#modalForm').onsubmit = e => {
       e.preventDefault();
       const f = new FormData(e.target);
-      state.tasks.push({ id: uid(), title: f.get('title'), date: f.get('date'), time: f.get('time'), category: f.get('category'), done: false });
+      state.tasks.push({ id: uid(), title: f.get('title'), date: f.get('date'), time: f.get('time'), category: f.get('category'), repeat: f.get('repeat') || 'none', done: false });
       state.meta.firstOpen = false;
       closeModal();
       saveState();

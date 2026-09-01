@@ -240,6 +240,9 @@ export default {
         const known = Array.isArray(body.known_bank_keys)
           ? body.known_bank_keys.map(String).filter(Boolean).slice(-1500)
           : [];
+        const ownIbans = Array.isArray(body.own_account_ibans)
+          ? [...new Set(body.own_account_ibans.map(normalizeIban).filter(iban => /^[A-Z]{2}[A-Z0-9]{13,32}$/.test(iban)))].slice(0, 50)
+          : [];
         await registryRequest(env, '/upsert', {
           method: 'POST',
           body: {
@@ -250,6 +253,7 @@ export default {
             language: String(body.language || 'et').toLowerCase() === 'en' ? 'en' : 'et',
             notifications,
             knownBankKeys: known,
+            ownAccountIbans: ownIbans,
             updatedAt: Date.now()
           }
         });
@@ -551,6 +555,36 @@ function normalizeTransaction(raw, accountId) {
   const status = String(raw.status || '').toUpperCase();
   const pending = status && !['BOOK', 'ACCC', 'ACSC'].includes(status);
   const txId = raw.entry_reference || raw.entryReference || raw.transaction_id || raw.transactionId || `${date}:${signedAmount}:${merchant}:${raw.reference_number || raw.referenceNumber || ''}`;
+  const balanceAfter = raw?.balance_after_transaction || raw?.balanceAfterTransaction || null;
+  const exchangeRate = raw?.exchange_rate || raw?.exchangeRate || null;
+  const debtorAgent = raw?.debtor_agent || raw?.debtorAgent || null;
+  const creditorAgent = raw?.creditor_agent || raw?.creditorAgent || null;
+  const details = {
+    transaction_date: raw.transaction_date || raw.transactionDate || '',
+    booking_date: raw.booking_date || raw.bookingDate || '',
+    value_date: raw.value_date || raw.valueDate || '',
+    status: status || '',
+    currency: amountObj.currency || 'EUR',
+    credit_debit_indicator: indicator || (isCredit ? 'CRDT' : 'DBIT'),
+    counterparty_name: partyName || '',
+    counterparty_iban: counterpartyIban || '',
+    debtor_name: debtor || '',
+    creditor_name: creditor || '',
+    debtor_iban: debtorIban || '',
+    creditor_iban: creditorIban || '',
+    remittance_information: remittance || '',
+    reference_number: raw.reference_number || raw.referenceNumber || '',
+    reference_number_schema: raw.reference_number_schema || raw.referenceNumberSchema || '',
+    bank_transaction_code: bankCode || '',
+    entry_reference: raw.entry_reference || raw.entryReference || '',
+    transaction_id: raw.transaction_id || raw.transactionId || '',
+    merchant_category_code: raw.merchant_category_code || raw.merchantCategoryCode || '',
+    balance_after_transaction: balanceAfter?.amount != null ? `${balanceAfter.amount} ${balanceAfter.currency || amountObj.currency || 'EUR'}` : '',
+    exchange_rate: exchangeRate ? [exchangeRate.exchange_rate || exchangeRate.exchangeRate, exchangeRate.unit_currency || exchangeRate.unitCurrency, exchangeRate.rate_type || exchangeRate.rateType].filter(Boolean).join(' · ') : '',
+    debtor_agent: debtorAgent ? [debtorAgent.name, debtorAgent.bic_fi || debtorAgent.bicFi].filter(Boolean).join(' · ') : '',
+    creditor_agent: creditorAgent ? [creditorAgent.name, creditorAgent.bic_fi || creditorAgent.bicFi].filter(Boolean).join(' · ') : '',
+    note: String(raw.note || '')
+  };
 
   return {
     bank_key: `${accountId}:${txId}`,
@@ -565,7 +599,8 @@ function normalizeTransaction(raw, accountId) {
     pending,
     counterparty_iban: counterpartyIban,
     status: status || '',
-    category: classify(merchant, note, signedAmount)
+    category: classify(merchant, note, signedAmount),
+    details
   };
 }
 
@@ -741,6 +776,17 @@ function cors(response) {
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers: h });
 }
 
+function normalizeIban(value) {
+  return String(value || '').replace(/\s+/g, '').toUpperCase();
+}
+
+function isRegisteredOwnTransfer(registration, tx) {
+  const counterpart = normalizeIban(tx?.counterparty_iban || tx?.details?.counterparty_iban || '');
+  if (!counterpart) return false;
+  const own = new Set((registration?.ownAccountIbans || []).map(normalizeIban).filter(Boolean));
+  return own.has(counterpart);
+}
+
 function pushConfigured(env) {
   return Boolean(env.FIREBASE_SERVICE_ACCOUNT_JSON && env.PUSH_REGISTRY);
 }
@@ -849,6 +895,7 @@ async function pollOneRegistration(env, registration) {
   if (seeded) {
     const accountNames = payload.aliases || {};
     for (const tx of newTransactions.slice(-12)) {
+      if (isRegisteredOwnTransfer(registration, tx)) continue;
       await sendBankPush(env, registration, tx, String(accountNames[tx.account_id] || ''));
     }
   }
