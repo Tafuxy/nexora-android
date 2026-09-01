@@ -31,6 +31,7 @@ final class NotificationCoordinator {
         let relevant: [String: Any] = [
             "language": object["language"] ?? "et",
             "notifications": object["notifications"] ?? [:],
+            "tasks": object["tasks"] ?? [],
             "bills": object["bills"] ?? [],
             "vehicles": object["vehicles"] ?? [],
             "budget": object["budget"] ?? [:]
@@ -144,9 +145,45 @@ final class NotificationCoordinator {
         center.getPendingNotificationRequests { requests in
             let ids = requests.map(\.identifier).filter { $0.hasPrefix("nexora-reminder-") }
             center.removePendingNotificationRequests(withIdentifiers: ids)
+            self.addTaskReminders(config: config)
             self.addBillReminders(config: config)
             self.addVehicleReminders(config: config)
             self.checkImmediateThresholds(config: config)
+        }
+    }
+
+    private func addTaskReminders(config: [String: Any]) {
+        let settings = config["notifications"] as? [String: Any] ?? [:]
+        guard (settings["tasks"] as? Bool) != false else { return }
+        let lang = config["language"] as? String ?? "et"
+        let et = lang == "et"
+        guard let tasks = config["tasks"] as? [[String: Any]] else { return }
+        let center = UNUserNotificationCenter.current()
+        let calendar = Calendar.current
+        let now = Date()
+
+        for task in tasks.prefix(128) {
+            if (task["reminder"] as? Bool) == false { continue }
+            guard let rawDate = task["date"] as? String, rawDate.count >= 10,
+                  let day = ISO8601DateFormatter.dateOnly.date(from: String(rawDate.prefix(10))) else { continue }
+            var comps = calendar.dateComponents([.year,.month,.day], from: day)
+            comps.hour = 9
+            comps.minute = 0
+            if let rawTime = task["time"] as? String, rawTime.count >= 5 {
+                let bits = rawTime.prefix(5).split(separator: ":")
+                if bits.count == 2 {
+                    comps.hour = Int(bits[0]) ?? 9
+                    comps.minute = Int(bits[1]) ?? 0
+                }
+            }
+            guard let fire = calendar.date(from: comps), fire > now else { continue }
+            let content = UNMutableNotificationContent()
+            content.sound = .default
+            content.title = et ? "Ülesande meeldetuletus" : "Task reminder"
+            content.body = task["title"] as? String ?? (et ? "Sul on ülesanne" : "You have a task")
+            let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
+            let id = task["id"] as? String ?? UUID().uuidString
+            center.add(UNNotificationRequest(identifier: "nexora-reminder-task-\(id)-\(rawDate)-\(comps.hour ?? 9)-\(comps.minute ?? 0)", content: content, trigger: trigger))
         }
     }
 

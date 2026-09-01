@@ -39,8 +39,10 @@ public class BackgroundSyncJobService extends JobService {
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
     static void saveConfig(Context context, String json) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(CONFIG, json == null ? "{}" : json).apply();
+        String safeJson = json == null ? "{}" : json;
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(CONFIG, safeJson).apply();
         schedule(context);
+        TaskReminderScheduler.scheduleFromConfig(context, safeJson);
     }
 
     static void schedule(Context context) {

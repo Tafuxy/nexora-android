@@ -13,6 +13,7 @@ export default {
       if (url.pathname === '/health') {
         return json({
           ok: true,
+          version: '10.0.0',
           provider: 'enable-banking',
           configured: configured(env),
           mode: 'linked-accounts-compatible',
@@ -30,7 +31,7 @@ export default {
           <h2>Device data</h2>
           <p>Your Nexora data is primarily stored on your device. Biometric templates are handled only by Android or iOS and are never available to Nexora.</p>
           <h2>Notifications</h2>
-          <p>If you allow notifications, Nexora may alert you about incoming or outgoing money, bill due dates, spending limits, vehicle service, insurance and inspection dates. Android push delivery uses Firebase Cloud Messaging and a device-specific Firebase registration token. Notification detail level can be changed in Nexora settings.</p>
+          <p>If you allow notifications, Nexora may alert you about incoming or outgoing money, tasks, bill due dates, spending limits, vehicle service, insurance and inspection dates. Android push delivery uses Firebase Cloud Messaging and a device-specific Firebase registration token. For bank-activity push processing, the server keeps limited connection metadata and one-way SHA-256 hashes of your own account identifiers so transfers between your own accounts can be suppressed without storing those account identifiers in readable form. Notification detail level can be changed in Nexora settings.</p>
           <h2>Contact</h2>
           <p>For data protection questions, contact the email address registered for the Nexora Enable Banking application.</p>
         `);
@@ -261,6 +262,9 @@ export default {
         const ownIbans = Array.isArray(body.own_account_ibans)
           ? [...new Set(body.own_account_ibans.map(normalizeIban).filter(iban => /^[A-Z]{2}[A-Z0-9]{13,32}$/.test(iban)))].slice(0, 50)
           : [];
+        // The push registry only needs equality checks. Store one-way hashes instead of
+        // readable account identifiers to reduce the sensitivity of long-lived metadata.
+        const ownIbanHashes = await Promise.all(ownIbans.map(hashIban));
         await registryRequest(env, '/upsert', {
           method: 'POST',
           body: {
@@ -271,7 +275,7 @@ export default {
             language: String(body.language || 'et').toLowerCase() === 'en' ? 'en' : 'et',
             notifications,
             knownBankKeys: known,
-            ownAccountIbans: ownIbans,
+            ownAccountIbanHashes: ownIbanHashes,
             updatedAt: Date.now()
           }
         });
@@ -308,10 +312,20 @@ export default {
         const installId = validateInstall(body.install_id);
         const payload = await verifyHandle(env, String(body.bank_handle || ''));
         if (payload.install !== installId) throw httpError(403, 'Connection does not belong to this installation');
+        let providerWarning = '';
         if (payload.phase === 'session' && payload.sid) {
-          await eb(env, `/sessions/${encodeURIComponent(payload.sid)}`, { method: 'DELETE' });
+          try {
+            await eb(env, `/sessions/${encodeURIComponent(payload.sid)}`, { method: 'DELETE' });
+          } catch (err) {
+            // An already expired/revoked bank session is effectively disconnected. Do not
+            // block local cleanup or leave a stale push registration behind.
+            if (!needsReauthorization(err)) providerWarning = String(err?.message || 'Provider disconnect failed').slice(0, 200);
+          }
         }
-        return json({ ok: true });
+        if (env.PUSH_REGISTRY) {
+          await registryRequest(env, '/delete', { method: 'POST', body: { installId } }).catch(() => {});
+        }
+        return json({ ok: true, warning: providerWarning || undefined });
       }
 
       return json({ error: 'Not found' }, 404);
@@ -590,6 +604,7 @@ function normalizeTransaction(raw, accountId) {
   const note = [remittance, raw.note, raw.reference_number || raw.referenceNumber, bankCode].filter(Boolean).join(' · ').slice(0, 300);
   const merchant = cleanMerchant(partyName || remittance || raw.note || bankCode || 'Bank transaction');
   const status = String(raw.status || '').toUpperCase();
+  const merchantCategoryCode = String(raw.merchant_category_code || raw.merchantCategoryCode || '').trim();
   const pending = status && !['BOOK', 'ACCC', 'ACSC'].includes(status);
   const txId = raw.entry_reference || raw.entryReference || raw.transaction_id || raw.transactionId || `${date}:${signedAmount}:${merchant}:${raw.reference_number || raw.referenceNumber || ''}`;
   const balanceAfter = raw?.balance_after_transaction || raw?.balanceAfterTransaction || null;
@@ -615,7 +630,7 @@ function normalizeTransaction(raw, accountId) {
     bank_transaction_code: bankCode || '',
     entry_reference: raw.entry_reference || raw.entryReference || '',
     transaction_id: raw.transaction_id || raw.transactionId || '',
-    merchant_category_code: raw.merchant_category_code || raw.merchantCategoryCode || '',
+    merchant_category_code: merchantCategoryCode,
     balance_after_transaction: balanceAfter?.amount != null ? `${balanceAfter.amount} ${balanceAfter.currency || amountObj.currency || 'EUR'}` : '',
     exchange_rate: exchangeRate ? [exchangeRate.exchange_rate || exchangeRate.exchangeRate, exchangeRate.unit_currency || exchangeRate.unitCurrency, exchangeRate.rate_type || exchangeRate.rateType].filter(Boolean).join(' · ') : '',
     debtor_agent: debtorAgent ? [debtorAgent.name, debtorAgent.bic_fi || debtorAgent.bicFi].filter(Boolean).join(' · ') : '',
@@ -636,7 +651,7 @@ function normalizeTransaction(raw, accountId) {
     pending,
     counterparty_iban: counterpartyIban,
     status: status || '',
-    category: classify(merchant, note, signedAmount),
+    category: classify(merchant, note, signedAmount, merchantCategoryCode),
     details
   };
 }
@@ -645,14 +660,16 @@ function cleanMerchant(value) {
   return String(value || '').replace(/\s+/g, ' ').replace(/^CARD PAYMENT\s*/i, '').trim().slice(0, 100) || 'Bank transaction';
 }
 
-function classify(name, note, signedAmount) {
+function classify(name, note, signedAmount, mcc = '') {
   const text = `${name} ${note}`.toLowerCase();
+  const mccCode = String(mcc || '').replace(/\D/g, '');
   if (signedAmount > 0) {
     if (/salary|palk|wage|payroll|töötasu|tootasu/.test(text)) return 'Salary';
     return 'Income';
   }
+  if (['5541','5542'].includes(mccCode)) return 'Fuel';
   if (/rimi|selver|maxima|prisma|coop.*kauplus|lidl|grocery|food/.test(text)) return 'Food';
-  if (/circle k|alexela|olerex|terminal oil|neste|fuel|tankla/.test(text)) return 'Fuel';
+  if (/circle k|alexela|olerex|terminal(?: oil)?|neste|jetoil|jet oil|krooning|premium 7|fuel|tankla/.test(text)) return 'Fuel';
   if (/telia|elisa|tele2|internet|mobile|telefon/.test(text)) return 'PhoneInternet';
   if (/elektrum|enefit|elekter|electric|water|vesi|gaas|utilities/.test(text)) return 'Utilities';
   if (/spotify|netflix|youtube|apple\.com\/bill|google.*storage|subscription/.test(text)) return 'Subscription';
@@ -817,11 +834,31 @@ function normalizeIban(value) {
   return String(value || '').replace(/\s+/g, '').toUpperCase();
 }
 
-function isRegisteredOwnTransfer(registration, tx) {
+async function hashIban(value) {
+  const normalized = normalizeIban(value);
+  if (!normalized) return '';
+  const bytes = new TextEncoder().encode(normalized);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function isRegisteredOwnTransfer(registration, tx) {
+  const hashes = new Set((registration?.ownAccountIbanHashes || []).map(String).filter(Boolean));
+  // Backward compatibility for registrations created before V10. They disappear on the
+  // next upsert, where only hashes are retained.
+  const legacyOwn = new Set((registration?.ownAccountIbans || []).map(normalizeIban).filter(Boolean));
+  const isOwn = async iban => {
+    const normalized = normalizeIban(iban);
+    if (!normalized) return false;
+    if (legacyOwn.has(normalized)) return true;
+    if (!hashes.size) return false;
+    return hashes.has(await hashIban(normalized));
+  };
   const counterpart = normalizeIban(tx?.counterparty_iban || tx?.details?.counterparty_iban || '');
-  if (!counterpart) return false;
-  const own = new Set((registration?.ownAccountIbans || []).map(normalizeIban).filter(Boolean));
-  return own.has(counterpart);
+  if (counterpart) return isOwn(counterpart);
+  const debtor = normalizeIban(tx?.details?.debtor_iban || '');
+  const creditor = normalizeIban(tx?.details?.creditor_iban || '');
+  return Boolean(debtor && creditor && await isOwn(debtor) && await isOwn(creditor));
 }
 
 function pushConfigured(env) {
@@ -932,7 +969,7 @@ async function pollOneRegistration(env, registration) {
   if (seeded) {
     const accountNames = payload.aliases || {};
     for (const tx of newTransactions.slice(-12)) {
-      if (isRegisteredOwnTransfer(registration, tx)) continue;
+      if (await isRegisteredOwnTransfer(registration, tx)) continue;
       await sendBankPush(env, registration, tx, String(accountNames[tx.account_id] || ''));
     }
   }
@@ -1140,7 +1177,7 @@ export class PushRegistry {
       if (!installId) return new Response(JSON.stringify({ error: 'installId required' }), { status: 400 });
       const previous = registrations[installId] || {};
       const known = new Set([...(previous.seenBankKeys || []), ...(previous.knownBankKeys || []), ...(body.knownBankKeys || [])]);
-      registrations[installId] = {
+      const next = {
         ...previous,
         ...body,
         notifications: { ...(previous.notifications || {}), ...(body.notifications || {}) },
@@ -1149,6 +1186,8 @@ export class PushRegistry {
         seeded: Boolean(previous.seeded),
         nextPollAt: Number(previous.nextPollAt || 0)
       };
+      if (Array.isArray(body.ownAccountIbanHashes)) delete next.ownAccountIbans;
+      registrations[installId] = next;
       await this.state.storage.put('registrations', registrations);
       return new Response(JSON.stringify({ ok: true }), { headers: { 'Content-Type': 'application/json' } });
     }
@@ -1158,6 +1197,15 @@ export class PushRegistry {
       const installId = String(body.installId || '');
       if (!installId || !registrations[installId]) return new Response(JSON.stringify({ error: 'registration not found' }), { status: 404 });
       registrations[installId] = { ...registrations[installId], ...(body.patch || {}) };
+      await this.state.storage.put('registrations', registrations);
+      return new Response(JSON.stringify({ ok: true }), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    if (url.pathname === '/delete' && request.method === 'POST') {
+      const body = await request.json();
+      const installId = String(body.installId || '');
+      if (!installId) return new Response(JSON.stringify({ error: 'installId required' }), { status: 400 });
+      delete registrations[installId];
       await this.state.storage.put('registrations', registrations);
       return new Response(JSON.stringify({ ok: true }), { headers: { 'Content-Type': 'application/json' } });
     }

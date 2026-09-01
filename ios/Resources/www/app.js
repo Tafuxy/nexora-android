@@ -239,7 +239,7 @@ const translations = {
     allTime: 'kogu aeg',
     categories: {
       Personal: 'Isiklik', Work: 'Töö', Garage: 'Garaaž', Money: 'Raha', Other: 'Muu',
-      Food: 'Toit', Fuel: 'Kütus', Maintenance: 'Hooldus', Car: 'Auto', Insurance: 'Kindlustus', Shopping: 'Ostud', Bills: 'Arved', Salary: 'Palk', Income: 'Muu tulu', Bonus: 'Boonus', OtherIncome: 'Muu tulu', Rent: 'Üür / laen', Utilities: 'Kommunaalid', PhoneInternet: 'Telefon / internet', Subscription: 'Tellimus', Loan: 'Laen / liising'
+      Food: 'Toit', Fuel: 'Tankla', Maintenance: 'Hooldus', Car: 'Auto', Insurance: 'Kindlustus', Shopping: 'Ostud', Bills: 'Arved', Salary: 'Palk', Income: 'Muu tulu', Bonus: 'Boonus', OtherIncome: 'Muu tulu', Rent: 'Üür / laen', Utilities: 'Kommunaalid', PhoneInternet: 'Telefon / internet', Subscription: 'Tellimus', Loan: 'Laen / liising'
     }
   },
   en: {
@@ -460,7 +460,7 @@ const translations = {
     allTime: 'all time',
     categories: {
       Personal: 'Personal', Work: 'Work', Garage: 'Garage', Money: 'Money', Other: 'Other',
-      Food: 'Food', Fuel: 'Fuel', Maintenance: 'Maintenance', Car: 'Car', Insurance: 'Insurance', Shopping: 'Shopping', Bills: 'Bills', Salary: 'Salary', Income: 'Other income', Bonus: 'Bonus', OtherIncome: 'Other income', Rent: 'Rent / mortgage', Utilities: 'Utilities', PhoneInternet: 'Phone / internet', Subscription: 'Subscription', Loan: 'Loan / lease'
+      Food: 'Food', Fuel: 'Petrol station', Maintenance: 'Maintenance', Car: 'Car', Insurance: 'Insurance', Shopping: 'Shopping', Bills: 'Bills', Salary: 'Salary', Income: 'Other income', Bonus: 'Bonus', OtherIncome: 'Other income', Rent: 'Rent / mortgage', Utilities: 'Utilities', PhoneInternet: 'Phone / internet', Subscription: 'Subscription', Loan: 'Loan / lease'
     }
   }
 };
@@ -601,14 +601,15 @@ function o(key) {
 }
 
 const cleanDefaults = {
-  settings: { language: '', interests: [], ownAccountIbans: [], requireAuth: true, biometricEnabled: false, notifications: { moneyReceived: true, moneySpent: true, bills: true, vehicles: true, budget: true, privacy: 'hideAmount' } },
+  settings: { language: '', interests: [], ownAccountIbans: [], requireAuth: true, biometricEnabled: false, notifications: { moneyReceived: true, moneySpent: true, tasks: true, bills: true, vehicles: true, budget: true, privacy: 'hideAmount' } },
   profile: { name: '', monthlyBudget: 0, monthlyIncome: 0, savingsGoal: 0, savingsCurrent: 0 },
   tasks: [],
+  taskHistory: [],
   transactions: [],
   bills: [],
   vehicles: [],
   bank: { installId: '', handle: '', connected: false, institutionId: '', accounts: [], lastGoodAccounts: [], lastSync: '', syncStatus: '', syncWarning: '', reauthorizationRequired: false, lastTotalBalance: null },
-  meta: { firstOpen: true, setupComplete: false, appVersion: '1.8.9' }
+  meta: { firstOpen: true, setupComplete: false, appVersion: '10.0.0', schemaVersion: 10 }
 };
 
 const DEMO_TASKS = ['Review today’s priorities', 'Check upcoming car costs'];
@@ -645,13 +646,15 @@ function deepMerge(base, incoming) {
 }
 
 function loadState() {
-  try {
-    const raw = JSON.parse(localStorage.getItem('nexora-state') || '{}');
-    const merged = deepMerge(cleanDefaults, raw);
-    return sanitizeState(merged);
-  } catch {
-    return clone(cleanDefaults);
+  const candidates = [localStorage.getItem('nexora-state'), localStorage.getItem('nexora-state-backup')].filter(Boolean);
+  for (const rawText of candidates) {
+    try {
+      const raw = JSON.parse(rawText);
+      const merged = deepMerge(cleanDefaults, raw);
+      return sanitizeState(merged);
+    } catch (_) {}
   }
+  return clone(cleanDefaults);
 }
 
 function sanitizeState(input) {
@@ -674,7 +677,19 @@ function sanitizeState(input) {
   s.profile.monthlyIncome = Number(s.profile.monthlyIncome || 0);
   s.profile.savingsGoal = Number(s.profile.savingsGoal || 0);
   s.profile.savingsCurrent = Number(s.profile.savingsCurrent || 0);
-  s.tasks = Array.isArray(s.tasks) ? s.tasks.map(task => ({ ...task, repeat: ['daily','weekly','monthly'].includes(task?.repeat) ? task.repeat : 'none' })) : [];
+  s.tasks = Array.isArray(s.tasks) ? s.tasks.map(task => ({ ...task, repeat: ['daily','weekly','monthly'].includes(task?.repeat) ? task.repeat : 'none', reminder: task?.reminder !== false })) : [];
+  s.taskHistory = Array.isArray(s.taskHistory) ? s.taskHistory.map(item => ({ ...item, historyId: item?.historyId || uid(), done: true })) : [];
+  // Migrate completed one-off tasks from older builds into a real history so the active
+  // planner stays clean after the user finishes a day.
+  const legacyDone = s.tasks.filter(task => task?.done && (!task.repeat || task.repeat === 'none'));
+  if (legacyDone.length) {
+    for (const task of legacyDone) {
+      if (!s.taskHistory.some(item => item.sourceTaskId === task.id && item.completedAt === task.completedAt)) {
+        s.taskHistory.push({ ...task, historyId: uid(), sourceTaskId: task.id, completedAt: task.completedAt || new Date().toISOString(), done: true });
+      }
+    }
+    s.tasks = s.tasks.filter(task => !(task?.done && (!task.repeat || task.repeat === 'none')));
+  }
   s.transactions = Array.isArray(s.transactions) ? s.transactions : [];
   // Never infer real income/expenses from a temporary balance change. Older builds did
   // this and could create false spending when a bank sync briefly failed.
@@ -688,6 +703,7 @@ function sanitizeState(input) {
   s.settings.notifications = deepMerge(cleanDefaults.settings.notifications, s.settings?.notifications || {});
   s.settings.notifications.moneyReceived = s.settings.notifications.moneyReceived !== false;
   s.settings.notifications.moneySpent = s.settings.notifications.moneySpent !== false;
+  s.settings.notifications.tasks = s.settings.notifications.tasks !== false;
   s.settings.notifications.bills = s.settings.notifications.bills !== false;
   s.settings.notifications.vehicles = s.settings.notifications.vehicles !== false;
   s.settings.notifications.budget = s.settings.notifications.budget !== false;
@@ -699,7 +715,7 @@ function sanitizeState(input) {
   s.bank.lastGoodAccounts = Array.isArray(s.bank.lastGoodAccounts) ? s.bank.lastGoodAccounts : [];
   s.bank.installId = String(s.bank.installId || '');
   if (!s.bank.installId) s.bank.installId = `install-${uid()}`;
-  s.meta = { ...(s.meta || {}), appVersion: '1.8.9', firstOpen: Boolean(s.meta?.firstOpen), setupComplete: Boolean(s.meta?.setupComplete) };
+  s.meta = { ...(s.meta || {}), appVersion: '10.0.0', schemaVersion: 10, firstOpen: Boolean(s.meta?.firstOpen), setupComplete: Boolean(s.meta?.setupComplete) };
   return s;
 }
 
@@ -719,11 +735,19 @@ function notificationConfigPayload() {
     notifications: {
       moneyReceived: notifications.moneyReceived !== false,
       moneySpent: notifications.moneySpent !== false,
+      tasks: notifications.tasks !== false,
       bills: notifications.bills !== false,
       vehicles: notifications.vehicles !== false,
       budget: notifications.budget !== false,
       privacy: notifications.privacy || 'hideAmount'
     },
+    tasks: state.tasks.filter(task => !task.done).map(task => ({
+      id: task.id,
+      title: task.title || '',
+      date: task.date || '',
+      time: task.time || '',
+      reminder: task.reminder !== false
+    })),
     bills: state.bills.filter(b => b.active !== false).map(bill => ({
       id: bill.id,
       name: bill.name,
@@ -760,7 +784,17 @@ function syncNativeNotificationConfig(requestPermission = false) {
 }
 
 function saveState(renderAfter = true) {
-  localStorage.setItem('nexora-state', JSON.stringify(state));
+  const serialized = JSON.stringify(state);
+  try {
+    const previous = localStorage.getItem('nexora-state');
+    if (previous && previous !== serialized) {
+      // Never replace a known-good backup with a corrupt primary payload.
+      try { JSON.parse(previous); localStorage.setItem('nexora-state-backup', previous); } catch (_) {}
+    }
+    localStorage.setItem('nexora-state', serialized);
+  } catch (error) {
+    console.error('Nexora state save failed', error);
+  }
   syncNativeNotificationConfig(false);
   if (renderAfter) render();
 }
@@ -1114,9 +1148,17 @@ function ownAccountIbans() {
 
 function isInternalBankTransfer(tx) {
   if (!tx || tx.source !== 'bank') return false;
-  const counterpart = normalizedIban(tx.counterpartyIban || tx.bankDetails?.counterparty_iban);
-  if (!counterpart) return false;
-  return ownAccountIbans().includes(counterpart);
+  if (tx.internalTransferOverride === true) return true;
+  if (tx.internalTransferOverride === false) return false;
+  const own = new Set(ownAccountIbans());
+  const d = tx.bankDetails || {};
+  const counterpart = normalizedIban(tx.counterpartyIban || d.counterparty_iban);
+  if (counterpart) return own.has(counterpart);
+  // When a provider does not expose a dedicated counterparty IBAN, only treat the
+  // transaction as internal if both transaction endpoints are known own accounts.
+  const debtor = normalizedIban(d.debtor_iban || d.debtorIban);
+  const creditor = normalizedIban(d.creditor_iban || d.creditorIban);
+  return Boolean(debtor && creditor && own.has(debtor) && own.has(creditor));
 }
 
 function monthTransactions() {
@@ -1179,6 +1221,51 @@ function advanceRecurringTask(task) {
   return true;
 }
 
+function addTaskHistoryEntry(task) {
+  const completedAt = new Date().toISOString();
+  state.taskHistory.unshift({
+    ...clone(task),
+    historyId: uid(),
+    sourceTaskId: task.id,
+    done: true,
+    completedAt
+  });
+  // Keep local state bounded while retaining years of normal usage.
+  if (state.taskHistory.length > 2500) state.taskHistory = state.taskHistory.slice(0, 2500);
+  return completedAt;
+}
+
+function completeTask(task) {
+  if (!task) return;
+  addTaskHistoryEntry(task);
+  if (task.repeat && task.repeat !== 'none') {
+    advanceRecurringTask(task);
+    return;
+  }
+  state.tasks = state.tasks.filter(item => item.id !== task.id);
+}
+
+function taskHistoryGroups(limit = 180) {
+  const groups = new Map();
+  const recent = (state.taskHistory || []).slice().sort((a,b) => String(b.completedAt || b.date || '').localeCompare(String(a.completedAt || a.date || ''))).slice(0, limit);
+  for (const item of recent) {
+    const key = String(item.completedAt || item.date || '').slice(0, 10) || todayISO();
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  }
+  return [...groups.entries()].sort((a,b) => b[0].localeCompare(a[0]));
+}
+
+function taskHistoryRow(item) {
+  const stamp = item.completedAt ? new Date(item.completedAt) : null;
+  const time = stamp && !Number.isNaN(stamp.getTime()) ? new Intl.DateTimeFormat(locale(), {hour:'2-digit',minute:'2-digit'}).format(stamp) : (item.time || '');
+  return `<div class="row completed-task-row">
+    <span class="task-check checked static-check">${icons.check}</span>
+    <div class="row-main"><div class="row-title">${esc(item.title || '')}</div><div class="row-sub">${esc([time, item.category ? categoryLabel(item.category) : '', item.repeat && item.repeat !== 'none' ? `↻ ${taskRepeatLabel(item.repeat)}` : ''].filter(Boolean).join(' · '))}</div></div>
+    <button class="delete-btn" data-delete-task-history="${esc(item.historyId || '')}" aria-label="delete">×</button>
+  </div>`;
+}
+
 function upcomingTasks(limit = 4) {
   return state.tasks
     .filter(t => !t.done)
@@ -1189,7 +1276,7 @@ function upcomingTasks(limit = 4) {
 function categoryTotals() {
   const map = {};
   monthTransactions().filter(t => t.type === 'expense').forEach(t => map[t.category] = (map[t.category] || 0) + Number(t.amount || 0));
-  return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  return Object.entries(map).sort((a, b) => b[1] - a[1]);
 }
 
 
@@ -1277,7 +1364,8 @@ function bankAccountDisplayName(account) {
 function bankAccountMeta(account) {
   const iban = String(account?.iban || '');
   const tail = iban ? `•••• ${iban.slice(-4)}` : '';
-  return [bankAccountTypeLabel(account), tail].filter(Boolean).join(' · ');
+  const stale = account?.syncStale ? (lang() === 'et' ? 'viimane seis' : 'last saved') : '';
+  return [bankAccountTypeLabel(account), tail, stale].filter(Boolean).join(' · ');
 }
 
 function animateMoneyChanges() {
@@ -1478,7 +1566,9 @@ function mergeBankTransactions(incoming) {
       id: existing?.id || uid(),
       type: raw.type === 'income' ? 'income' : 'expense',
       amount: Number(raw.amount || 0),
-      category: raw.category || existing?.category || 'Other',
+      category: existing?.categoryOverridden ? (existing.category || 'Other') : (raw.category || existing?.category || 'Other'),
+      categoryOverridden: Boolean(existing?.categoryOverridden),
+      internalTransferOverride: existing?.internalTransferOverride === true ? true : (existing?.internalTransferOverride === false ? false : null),
       date: raw.date || todayISO(),
       note: raw.merchant || raw.note || existing?.note || '',
       bankKey: raw.bank_key,
@@ -1509,11 +1599,15 @@ function mergeBankAccounts(incoming) {
   const previousByStable = new Map(priorRows.map(account => [bankAccountStableKey(account), account]));
   const previousById = new Map(priorRows.map(account => [String(account?.id || ''), account]));
   const rows = Array.isArray(incoming) ? incoming : [];
-  if (!rows.length && priorRows.length) return priorRows;
+  if (!rows.length && priorRows.length) return priorRows.map(account => ({ ...account, syncStale: true, missingSyncCount: Number(account?.missingSyncCount || 0) + 1 }));
 
-  return rows.map(account => {
+  const matched = new Set();
+  const merged = rows.map(account => {
     const id = String(account?.id || '');
-    const old = previousByStable.get(bankAccountStableKey(account)) || previousById.get(id) || {};
+    const stable = bankAccountStableKey(account);
+    const old = previousByStable.get(stable) || previousById.get(id) || {};
+    matched.add(bankAccountStableKey(old));
+    if (id) matched.add(`id:${id}`);
     const incomingBalance = nullableMoneyNumber(account?.balance);
     const previousBalance = nullableMoneyNumber(old?.balance);
     return {
@@ -1525,9 +1619,23 @@ function mergeBankAccounts(incoming) {
       account_type: String(account?.account_type || old?.account_type || ''),
       // Missing/null bank data means "unknown right now", not €0. Keep the
       // last trustworthy value until the bank returns a fresh balance.
-      balance: incomingBalance !== null ? incomingBalance : (previousBalance !== null ? previousBalance : null)
+      balance: incomingBalance !== null ? incomingBalance : (previousBalance !== null ? previousBalance : null),
+      syncStale: false,
+      missingSyncCount: 0
     };
   });
+
+  // A provider can occasionally return a partial account list. Preserve a missing
+  // account briefly instead of making the user's total balance jump down. Repeated
+  // misses eventually remove a genuinely closed/unshared account.
+  for (const old of priorRows) {
+    const stable = bankAccountStableKey(old);
+    const idKey = `id:${String(old?.id || '')}`;
+    if (matched.has(stable) || matched.has(idKey)) continue;
+    const misses = Number(old?.missingSyncCount || 0) + 1;
+    if (misses <= 3) merged.push({ ...old, syncStale: true, missingSyncCount: misses });
+  }
+  return merged;
 }
 
 function detectSalaryFromBank() {
@@ -1576,6 +1684,11 @@ async function syncBank(renderDuring = true) {
         : 'The bank did not return account details this time. Showing the last saved state.';
     } else {
       state.bank.syncWarning = Array.isArray(data.warnings) && data.warnings.length ? String(data.warnings[0]) : '';
+      if (!state.bank.syncWarning && safeAccounts.some(account => account?.syncStale)) {
+        state.bank.syncWarning = lang() === 'et'
+          ? 'Mõne konto värske info jäi seekord pangast tulemata. Näitan selle konto viimast usaldusväärset seisu.'
+          : 'Fresh data for one or more accounts was missing this time. Showing the last trustworthy state for those accounts.';
+      }
     }
 
     state.bank.connected = true;
@@ -1702,19 +1815,19 @@ function openOwnAccountsSettings() {
 function notificationText(key) {
   const et = {
     title: 'Teavitused', configure: 'Seadista', status: 'Taustal aktiivne',
-    moneyReceived: 'Raha laekumine', moneySpent: 'Raha väljaminek', bills: 'Arvete tähtajad',
+    moneyReceived: 'Raha laekumine', moneySpent: 'Raha väljaminek', tasks: 'Ülesannete meeldetuletused', bills: 'Arvete tähtajad',
     vehicles: 'Auto hooldus ja tähtajad', budget: 'Kululimiidi hoiatused', privacy: 'Lukuekraani privaatsus',
     full: 'Näita summat ja detaile', hideAmount: 'Peida summa', generic: 'Ainult üldine teavitus',
-    hint: 'Nexora annab märku raha liikumisest ning lähenevatest arvetest ja auto tähtaegadest.',
+    hint: 'Nexora annab märku raha liikumisest, ülesannetest, lähenevatest arvetest ja auto tähtaegadest.',
     save: 'Salvesta', permission: 'Luba teavitused', background: 'Pangategevuse push toimub serveri kaudu; telefon ei pea selleks taustal panka pollima.', test: 'Saada testteavitus', testSent: 'Testteavitus saadetud', testError: 'Testteavitust ei saanud saata',
     pushChecking: 'Kontrollin pushi olekut…', pushReady: 'Telefon on push-teavitusteks registreeritud', pushMissing: 'Telefon pole veel push-teavitusteks registreeritud', pushBackendMissing: 'Push-backend pole seadistatud', tokenReady: 'FCM token telefonis olemas', tokenMissing: 'FCM token telefonis puudub', registeredAt: 'Telefon registreeriti', lastPoll: 'Viimane pangakontroll', nextPoll: 'Järgmine taustakontroll', lastError: 'Viimane push-viga'
   };
   const en = {
     title: 'Notifications', configure: 'Configure', status: 'Background active',
-    moneyReceived: 'Money received', moneySpent: 'Money spent', bills: 'Bill due dates',
+    moneyReceived: 'Money received', moneySpent: 'Money spent', tasks: 'Task reminders', bills: 'Bill due dates',
     vehicles: 'Vehicle service and deadlines', budget: 'Spending limit warnings', privacy: 'Lock screen privacy',
     full: 'Show amount and details', hideAmount: 'Hide amount', generic: 'Generic notification only',
-    hint: 'Nexora can alert you about bank activity, upcoming bills and vehicle deadlines.',
+    hint: 'Nexora can alert you about bank activity, tasks, upcoming bills and vehicle deadlines.',
     save: 'Save', permission: 'Allow notifications', background: 'Bank activity push is handled by the server; your phone does not need to poll the bank in the background.', test: 'Send test notification', testSent: 'Test notification sent', testError: 'Could not send test notification',
     pushChecking: 'Checking push status…', pushReady: 'This phone is registered for push notifications', pushMissing: 'This phone is not registered for push notifications yet', pushBackendMissing: 'Push backend is not configured', tokenReady: 'FCM token exists on this phone', tokenMissing: 'FCM token is missing on this phone', registeredAt: 'Phone registered', lastPoll: 'Last bank check', nextPoll: 'Next background check', lastError: 'Last push error'
   };
@@ -1727,6 +1840,7 @@ function openNotificationSettings() {
     <div class="card soft" style="padding:14px"><div class="small muted">${notificationText('hint')}</div></div>
     <label class="toggle-row"><div><div class="row-title">${notificationText('moneyReceived')}</div></div><input type="checkbox" name="moneyReceived" ${n.moneyReceived!==false?'checked':''}></label>
     <label class="toggle-row"><div><div class="row-title">${notificationText('moneySpent')}</div></div><input type="checkbox" name="moneySpent" ${n.moneySpent!==false?'checked':''}></label>
+    <label class="toggle-row"><div><div class="row-title">${notificationText('tasks')}</div></div><input type="checkbox" name="tasks" ${n.tasks!==false?'checked':''}></label>
     <label class="toggle-row"><div><div class="row-title">${notificationText('bills')}</div></div><input type="checkbox" name="bills" ${n.bills!==false?'checked':''}></label>
     <label class="toggle-row"><div><div class="row-title">${notificationText('vehicles')}</div></div><input type="checkbox" name="vehicles" ${n.vehicles!==false?'checked':''}></label>
     <label class="toggle-row"><div><div class="row-title">${notificationText('budget')}</div></div><input type="checkbox" name="budget" ${n.budget!==false?'checked':''}></label>
@@ -1791,6 +1905,7 @@ function openNotificationSettings() {
     state.settings.notifications = {
       moneyReceived: f.get('moneyReceived') === 'on',
       moneySpent: f.get('moneySpent') === 'on',
+      tasks: f.get('tasks') === 'on',
       bills: f.get('bills') === 'on',
       vehicles: f.get('vehicles') === 'on',
       budget: f.get('budget') === 'on',
@@ -1858,11 +1973,14 @@ const views = {
   },
 
   planner() {
-    const open = state.tasks.filter(t => !t.done).length;
+    const active = state.tasks.filter(t => !t.done).slice().sort((a, b) => `${a.date || ''}${a.time || ''}`.localeCompare(`${b.date || ''}${b.time || ''}`));
+    const groups = taskHistoryGroups();
+    const historyTitle = lang() === 'et' ? 'Tehtud tööd' : 'Completed';
     return `<div class="stack">
       ${calendarStrip()}
-      <div class="section-title"><h3>${t('plannerTasks')}</h3><span class="pill">${open} ${t('openCount')}</span></div>
-      <section class="card"><div class="list">${state.tasks.length ? state.tasks.slice().sort((a, b) => `${a.date || ''}${a.time || ''}`.localeCompare(`${b.date || ''}${b.time || ''}`)).map(taskRow).join('') : `<div class="empty"><div class="empty-icon">✓</div>${t('noTasksYet')}</div>`}</div></section>
+      <div class="section-title"><h3>${t('plannerTasks')}</h3><span class="pill">${active.length} ${t('openCount')}</span></div>
+      <section class="card"><div class="list">${active.length ? active.map(taskRow).join('') : `<div class="empty"><div class="empty-icon">✓</div>${t('noTasksYet')}</div>`}</div></section>
+      ${groups.length ? `<div class="section-title"><h3>${historyTitle}</h3><span class="pill">${state.taskHistory.length}</span></div><section class="card task-history-card">${groups.map(([date, items]) => `<div class="task-history-group"><div class="task-history-date">${date === todayISO() ? t('today') : fmtDate(date)}</div><div class="list">${items.map(taskHistoryRow).join('')}</div></div>`).join('')}</section>` : ''}
       <button class="fab" data-add="task" aria-label="${t('addTask')}">+</button>
     </div>`;
   },
@@ -1908,7 +2026,7 @@ const views = {
         <div class="section-title"><h3>${t('topCategories')}</h3><span class="pill">${cats.length}</span></div>
         ${cats.length ? `<div class="category-list">${cats.map(([name, total]) => {
           const pct = f.spend ? (total / f.spend) * 100 : 0;
-          return `<div class="category-line"><div class="category-head"><span>${categoryLabel(name)}</span><strong>${money(total)}</strong></div><div class="category-track"><span style="width:${pct}%"></span></div></div>`;
+          return `<button type="button" class="category-line category-open" data-open-category="${esc(name)}"><div class="category-head"><span>${categoryLabel(name)}</span><strong>${money(total)}</strong><span class="category-chevron">›</span></div><div class="category-track"><span style="width:${pct}%"></span></div></button>`;
         }).join('')}</div>` : `<div class="empty">${t('noTransactions')}</div>`}
       </section>
 
@@ -1968,7 +2086,7 @@ const views = {
       <section class="card brand-card">
         <img class="brand-wordmark dark-logo" src="nexora-wordmark-dark.png" alt="Nexora" />
         <img class="brand-wordmark light-logo" src="nexora-wordmark-light.png" alt="Nexora" />
-        <div class="brand-version">Nexora · 1.8.9</div>
+        <div class="brand-version">Nexora · 10.0.0</div>
       </section>
       <section class="card">
         <div class="section-title"><h3>${t('statistics')}</h3></div>
@@ -2002,7 +2120,8 @@ const views = {
       <section class="card">
         <div class="section-title"><h3>${notificationText('title')}</h3><button class="ghost" data-open-notifications>${notificationText('configure')}</button></div>
         <div class="statline"><span>${notificationText('moneyReceived')} / ${notificationText('moneySpent')}</span><strong>${(state.settings.notifications?.moneyReceived!==false || state.settings.notifications?.moneySpent!==false) ? 'ON' : 'OFF'}</strong></div>
-        <div class="statline"><span>${notificationText('bills')} / ${notificationText('vehicles')}</span><strong>${(state.settings.notifications?.bills!==false || state.settings.notifications?.vehicles!==false) ? 'ON' : 'OFF'}</strong></div>
+        <div class="statline"><span>${notificationText('tasks')} / ${notificationText('bills')}</span><strong>${(state.settings.notifications?.tasks!==false || state.settings.notifications?.bills!==false) ? 'ON' : 'OFF'}</strong></div>
+        <div class="statline"><span>${notificationText('vehicles')} / ${notificationText('budget')}</span><strong>${(state.settings.notifications?.vehicles!==false || state.settings.notifications?.budget!==false) ? 'ON' : 'OFF'}</strong></div>
       </section>
       <section class="card">
         <div class="section-title"><h3>${o('security')}</h3><span class="pill good">${o('alwaysOn')}</span></div>
@@ -2081,6 +2200,50 @@ function filterTransactions(query) {
   return sorted.filter(item => transactionSearchText(item).includes(q));
 }
 
+function merchantGroupName(tx) {
+  const raw = String(tx.counterpartyName || tx.note || tx.bankDetails?.counterparty_name || tx.bankDetails?.creditor_name || tx.bankDetails?.debtor_name || '').trim();
+  const text = raw.toLowerCase();
+  if (/circle\s*k/.test(text)) return 'Circle K';
+  if (/olerex/.test(text)) return 'Olerex';
+  if (/alexela/.test(text)) return 'Alexela';
+  if (/neste/.test(text)) return 'Neste';
+  if (/terminal(?:\s+oil)?/.test(text)) return 'Terminal';
+  if (/jetoil|jet\s*oil/.test(text)) return 'Jetoil';
+  if (/krooning/.test(text)) return 'Krooning';
+  if (/premium\s*7/.test(text)) return 'Premium 7';
+  if (!raw || /^(bank transaction|card payment|payment|kaardimakse)$/i.test(raw)) return lang() === 'et' ? 'Muu tankla' : 'Other station';
+  return raw;
+}
+
+function categoryBreakdown(category) {
+  const rows = monthTransactions().filter(tx => tx.type === 'expense' && tx.category === category);
+  const groups = new Map();
+  for (const tx of rows) {
+    const name = category === 'Fuel' ? merchantGroupName(tx) : (tx.counterpartyName || tx.note || categoryLabel(category));
+    const current = groups.get(name) || { name, total: 0, count: 0, rows: [] };
+    current.total += Number(tx.amount || 0);
+    current.count += 1;
+    current.rows.push(tx);
+    groups.set(name, current);
+  }
+  return [...groups.values()].sort((a,b) => b.total - a.total);
+}
+
+function openCategoryDetails(category) {
+  const groups = categoryBreakdown(category);
+  const total = groups.reduce((sum, row) => sum + row.total, 0);
+  const count = groups.reduce((sum, row) => sum + row.count, 0);
+  const avg = count ? total / count : 0;
+  const title = categoryLabel(category);
+  const top = groups[0];
+  const unit = category === 'Fuel' ? (lang() === 'et' ? 'tankla' : 'station') : (lang() === 'et' ? 'koht' : 'merchant');
+  const heading = category === 'Fuel' ? (lang() === 'et' ? 'Kulud tanklate kaupa' : 'Spending by petrol station') : (lang() === 'et' ? 'Kulud kohtade kaupa' : 'Spending by merchant');
+  const stats = `<div class="category-detail-stats"><div><span>${lang()==='et'?'Kokku':'Total'}</span><strong>${money(total)}</strong></div><div><span>${lang()==='et'?'Tehinguid':'Transactions'}</span><strong>${count}</strong></div><div><span>${lang()==='et'?'Keskmine':'Average'}</span><strong>${money(avg)}</strong></div></div>`;
+  const topLine = top ? `<div class="card soft category-top-card"><span class="tiny muted">${lang()==='et'?'Kõige rohkem kulub':`Highest ${unit} spend`}</span><div class="category-top-row"><strong>${esc(top.name)}</strong><strong>${money(top.total)}</strong></div></div>` : '';
+  const list = groups.length ? `<div class="category-breakdown-list">${groups.map(row => { const pct = total ? Math.round((row.total/total)*100) : 0; return `<div class="category-breakdown-row"><div class="category-breakdown-head"><div><strong>${esc(row.name)}</strong><span>${row.count} ${lang()==='et'?'tehingut':'transactions'} · ${pct}%</span></div><strong>${money(row.total)}</strong></div><div class="category-track"><span style="width:${pct}%"></span></div><div class="tiny muted">${lang()==='et'?'Keskmine ost':'Average purchase'} ${money(row.count ? row.total/row.count : 0)}</div></div>`; }).join('')}</div>` : `<div class="empty">${t('noTransactions')}</div>`;
+  showModal(`<div class="tx-detail-head"><div><div class="tiny muted">${heading}</div><h2>${esc(title)}</h2></div></div>${stats}${topLine}${list}<div class="modal-actions"><button type="button" class="primary" data-close>${t('close')}</button></div>`);
+}
+
 function transactionDetailRow(label, value, opts = {}) {
   if (value === undefined || value === null || String(value).trim() === '') return '';
   return `<div class="tx-detail-row"><span>${esc(label)}</span><strong class="${opts.mono ? 'tx-detail-mono' : ''}">${esc(String(value))}</strong></div>`;
@@ -2129,8 +2292,18 @@ function openTransactionDetails(id) {
     transactionDetailRow(t('transactionEntryReference'), d.entry_reference, {mono:true}),
     transactionDetailRow(t('transactionId'), d.transaction_id, {mono:true})
   ].join('');
-  showModal(`<div class="tx-detail-head"><div><div class="tiny muted">${esc(t('transactionDetails'))}</div><h2>${esc(counterparty || categoryLabel(item.category || 'Other'))}</h2></div><div class="tx-detail-amount ${amountClass}">${sign}${money(item.amount)}</div></div><div class="tx-detail-list">${rows || `<div class="empty">${t('noDataYet')}</div>`}</div><div class="modal-actions tx-detail-actions"><button type="button" class="primary" data-close>${t('close')}</button></div>`);
+  const bankControls = item.source === 'bank' ? `<div class="tx-edit-box"><div class="field"><label>${t('category')}</label><select data-tx-category>${transactionCategoryOptions(item.type, item.category)}</select></div><label class="toggle-row"><div><div class="row-title">${lang()==='et'?'Oma kontode vaheline ülekanne':'Transfer between own accounts'}</div><div class="row-sub">${lang()==='et'?'Seda ei loeta tuluks ega kuluks.':'Excluded from income and expenses.'}</div></div><input type="checkbox" data-tx-internal ${internal?'checked':''}></label><button type="button" class="secondary" data-save-tx-fixes>${t('save')}</button></div>` : '';
+  showModal(`<div class="tx-detail-head"><div><div class="tiny muted">${esc(t('transactionDetails'))}</div><h2>${esc(counterparty || categoryLabel(item.category || 'Other'))}</h2></div><div class="tx-detail-amount ${amountClass}">${sign}${money(item.amount)}</div></div><div class="tx-detail-list">${rows || `<div class="empty">${t('noDataYet')}</div>`}</div>${bankControls}<div class="modal-actions tx-detail-actions"><button type="button" class="primary" data-close>${t('close')}</button></div>`);
   $('[data-close]')?.addEventListener('click', closeModal);
+  $('[data-save-tx-fixes]')?.addEventListener('click', () => {
+    const cat = $('[data-tx-category]')?.value || item.category || 'Other';
+    const internalChecked = Boolean($('[data-tx-internal]')?.checked);
+    item.category = cat;
+    item.categoryOverridden = true;
+    item.internalTransferOverride = internalChecked;
+    saveState(false);
+    openTransactionDetails(item.id);
+  });
 }
 
 function billCard(bill) {
@@ -2230,11 +2403,7 @@ function bindView() {
   $$('[data-toggle-task]').forEach(btn => btn.onclick = () => {
     const item = state.tasks.find(x => x.id === btn.dataset.toggleTask);
     if (item) {
-      if (item.repeat && item.repeat !== 'none' && !item.done) {
-        advanceRecurringTask(item);
-      } else {
-        item.done = !item.done;
-      }
+      completeTask(item);
       state.meta.firstOpen = false;
       saveState();
     }
@@ -2243,6 +2412,11 @@ function bindView() {
     state.tasks = state.tasks.filter(x => x.id !== btn.dataset.deleteTask);
     saveState();
   });
+  $$('[data-delete-task-history]').forEach(btn => btn.onclick = () => {
+    state.taskHistory = state.taskHistory.filter(x => String(x.historyId || '') !== String(btn.dataset.deleteTaskHistory || ''));
+    saveState();
+  });
+  $$('[data-open-category]').forEach(btn => btn.onclick = () => openCategoryDetails(btn.dataset.openCategory));
   const txSearch = $('#transactionSearch');
   if (txSearch) {
     txSearch.addEventListener('input', () => {
@@ -2296,6 +2470,8 @@ function exportData() {
 function resetData() {
   if (!confirm(t('resetConfirm'))) return;
   const language = state.settings.language;
+  localStorage.removeItem('nexora-state');
+  localStorage.removeItem('nexora-state-backup');
   state = clone(cleanDefaults);
   state.settings.language = language;
   try {
@@ -2334,11 +2510,12 @@ function openAdd(type) {
       <div class="grid-2"><div class="field"><label>${t('date')}</label><input name="date" type="date" value="${todayISO()}" required></div><div class="field"><label>${t('time')}</label><input name="time" type="time"></div></div>
       <div class="field"><label>${t('category')}</label><select name="category"><option value="Personal">${t('personal')}</option><option value="Work">${t('work')}</option><option value="Garage">${categoryLabel('Garage')}</option><option value="Money">${categoryLabel('Money')}</option><option value="Other">${t('other')}</option></select></div>
       <div class="field"><label>${t('repeat')}</label><select name="repeat"><option value="none">${t('repeatNone')}</option><option value="daily">${t('repeatDaily')}</option><option value="weekly">${t('repeatWeekly')}</option><option value="monthly">${t('repeatMonthly')}</option></select></div>
+      <label class="toggle-row"><div><div class="row-title">${lang()==='et'?'Meeldetuletus':'Reminder'}</div><div class="row-sub">${lang()==='et'?'Nexora annab ülesandest õigel ajal märku.':'Nexora reminds you when the task is due.'}</div></div><input type="checkbox" name="reminder" checked></label>
     `));
     $('#modalForm').onsubmit = e => {
       e.preventDefault();
       const f = new FormData(e.target);
-      state.tasks.push({ id: uid(), title: f.get('title'), date: f.get('date'), time: f.get('time'), category: f.get('category'), repeat: f.get('repeat') || 'none', done: false });
+      state.tasks.push({ id: uid(), title: f.get('title'), date: f.get('date'), time: f.get('time'), category: f.get('category'), repeat: f.get('repeat') || 'none', reminder: f.get('reminder') === 'on', done: false });
       state.meta.firstOpen = false;
       closeModal();
       saveState();

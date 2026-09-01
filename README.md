@@ -1,16 +1,31 @@
-# Nexora v1.8.9 — Bank Sync Reliability Fix
+# Nexora V10
 
-This release fixes the intermittent €0 / missing balance problem.
+Nexora V10 is a long-term reliability and usability release for the Android and iOS personal finance, planning and vehicle app.
 
-## Fixed
-- Missing/null balance values from Enable Banking are no longer coerced to `0`.
-- If a balance request fails temporarily, Nexora keeps the last trustworthy balance.
-- The total bank balance no longer displays a fake `0 €` when the provider returned no balance data.
-- Foreground/user-triggered account details, balances and transactions now all forward PSU headers consistently.
-- Bank/API rate-limit errors no longer silently replace a good balance; a friendly warning is shown instead.
-- Automatic foreground bank refresh is capped to once per 5 minutes to reduce repeated bank requests and battery/network use. Manual Sync still works immediately.
-- Balance parsing accepts both current snake_case and alternate camelCase Enable Banking balance field names.
-- Android versionCode is 25, so it installs over v1.8.8/versionCode 24 without uninstalling.
+## V10 highlights
+- Bank sync keeps the last trustworthy balance when a bank temporarily returns missing or partial account data.
+- Partial account lists no longer make the total balance suddenly drop; temporarily missing accounts are marked as using their last saved state.
+- Transfers between the user's own bank accounts are excluded from income and expense statistics.
+- Bank transaction category and internal-transfer status can be corrected manually and those corrections survive later syncs.
+- Fuel-station spending is shown under one user-facing category: **Tankla** (English: **Petrol station**).
+- Category rows are interactive. The Tankla detail view ranks station chains by current-month spend and shows total, transaction count, share and average purchase.
+- Tank-station recognition includes common Estonian chains and fuel MCC 5541/5542.
+- Completed one-off tasks leave the active planner and move to a dated completion history with completion time.
+- Daily, weekly and monthly recurring tasks create a history entry and automatically advance to the next useful occurrence.
+- Tasks can have reminders. Android uses local alarms and restores them after reboot; iOS schedules local notifications.
+- Local app state keeps a previous valid snapshot so a damaged primary localStorage payload does not force the app to start empty.
+- Disconnecting a bank also removes its server-side push registration when possible.
+- Android and iOS versioning is unified at **10.0.0** / build **26**.
 
-## Deploy
-Because `backend/src.js` changed, deploy the bank backend and then build the APK.
+## Bank backend
+The Cloudflare Worker in `backend/` must be deployed when `backend/src.js` changes. Required secrets and routes are documented in `backend/README.md`.
+
+## Android build
+The GitHub Actions workflow `.github/workflows/build-apk.yml` builds the Android APK.
+
+## iOS build
+The GitHub Actions workflow `.github/workflows/build-ios.yml` syncs the shared web UI into the iOS bundle, generates the Xcode project with XcodeGen and builds an unsigned IPA.
+
+## Release
+Version: **10.0.0**  
+Android versionCode / iOS build: **26**

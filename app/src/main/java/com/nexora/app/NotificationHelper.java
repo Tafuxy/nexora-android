@@ -27,7 +27,7 @@ final class NotificationHelper {
         bank.setDescription("Money received and spent through connected bank accounts");
         bank.setLockscreenVisibility(Notification.VISIBILITY_PRIVATE);
         NotificationChannel reminders = new NotificationChannel(CHANNEL_REMINDERS, "Reminders", NotificationManager.IMPORTANCE_DEFAULT);
-        reminders.setDescription("Bills, spending limits and vehicle reminders");
+        reminders.setDescription("Tasks, bills, spending limits and vehicle reminders");
         reminders.setLockscreenVisibility(Notification.VISIBILITY_PRIVATE);
         nm.createNotificationChannel(bank);
         nm.createNotificationChannel(reminders);
