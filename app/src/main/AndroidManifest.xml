@@ -15,9 +15,6 @@
         android:theme="@style/Theme.Nexora.Splash"
         android:usesCleartextTraffic="false">
         <meta-data
-            android:name="firebase_messaging_installation_id_enabled"
-            android:value="true" />
-        <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
             android:resource="@drawable/ic_notification" />
         <meta-data

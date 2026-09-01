@@ -1,4 +1,4 @@
-# Nexora 1.8.0 — Android FCM push + bank sync
+# Nexora 1.8.1 — Android FCM push + bank sync
 
 This package adds server-triggered Android push notifications through Firebase Cloud Messaging (FCM), while keeping Nexora's existing Enable Banking + Cloudflare architecture.
 
@@ -48,3 +48,10 @@ Optional alternative to committing the non-secret Firebase Android config:
 
 ## Firebase Android config
 `app/google-services.json` is already included in this package.
+
+
+## v9.1 Android build fix
+
+- AndroidX enabled for Firebase Messaging.
+- Uses the broadly supported FCM registration-token path for Android and HTTP v1 delivery.
+- Removes the FID-only Android registration path that caused compatibility/build issues in v9.

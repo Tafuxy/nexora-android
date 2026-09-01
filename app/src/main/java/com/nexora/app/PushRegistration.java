@@ -17,23 +17,23 @@ import java.util.concurrent.Executors;
 
 final class PushRegistration {
     private static final String PREFS = "nexora_push";
-    private static final String FID = "firebase_fid";
+    private static final String TOKEN = "fcm_token";
     private static final String CONFIG = "push_config";
     private static final ExecutorService EXECUTOR = Executors.newSingleThreadExecutor();
 
     private PushRegistration() {}
 
-    static void saveFid(Context context, String fid) {
-        if (fid == null || fid.trim().isEmpty()) return;
+    static void saveToken(Context context, String token) {
+        if (token == null || token.trim().isEmpty()) return;
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .edit().putString(FID, fid.trim()).apply();
+                .edit().putString(TOKEN, token.trim()).apply();
         registerIfReady(context.getApplicationContext());
     }
 
-    static void clearFid(Context context, String fid) {
+    static void clearToken(Context context, String token) {
         SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        String current = prefs.getString(FID, "");
-        if (fid == null || fid.equals(current)) prefs.edit().remove(FID).apply();
+        String current = prefs.getString(TOKEN, "");
+        if (token == null || token.equals(current)) prefs.edit().remove(TOKEN).apply();
     }
 
     static void updateConfig(Context context, String json) {
@@ -46,11 +46,11 @@ final class PushRegistration {
         EXECUTOR.execute(() -> {
             try {
                 SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-                String fid = prefs.getString(FID, "");
+                String token = prefs.getString(TOKEN, "");
                 JSONObject config = new JSONObject(prefs.getString(CONFIG, "{}"));
                 String api = config.optString("bankApiUrl", "").replaceAll("/$", "");
                 JSONObject bank = config.optJSONObject("bank");
-                if (fid.isEmpty() || api.isEmpty() || bank == null) return;
+                if (token.isEmpty() || api.isEmpty() || bank == null) return;
 
                 String installId = bank.optString("installId", "");
                 String handle = bank.optString("handle", "");
@@ -59,7 +59,7 @@ final class PushRegistration {
                 JSONObject body = new JSONObject()
                         .put("install_id", installId)
                         .put("bank_handle", handle)
-                        .put("fid", fid)
+                        .put("token", token)
                         .put("platform", "android")
                         .put("language", config.optString("language", "et"));
 
@@ -70,7 +70,7 @@ final class PushRegistration {
 
                 postJson(api + "/api/push/register", body);
             } catch (Exception ignored) {
-                // Registration is best-effort and will be retried on the next FCM registration,
+                // Registration is best-effort and will be retried on the next FCM token refresh,
                 // app state update or bank sync.
             }
         });

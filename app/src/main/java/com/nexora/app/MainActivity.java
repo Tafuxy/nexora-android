@@ -60,7 +60,11 @@ public class MainActivity extends Activity {
 
         prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         NotificationHelper.createChannels(this);
-        FirebaseMessaging.getInstance().register();
+        FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {
+            if (task.isSuccessful() && task.getResult() != null) {
+                PushRegistration.saveToken(this, task.getResult());
+            }
+        });
         configureSystemBars();
         setupContent();
         setupWebView();

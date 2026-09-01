@@ -190,8 +190,8 @@ export default {
         const body = await readJson(request);
         const installId = validateInstall(body.install_id);
         const handle = String(body.bank_handle || '');
-        const fid = String(body.fid || '').trim();
-        if (!fid || fid.length < 12 || fid.length > 512) throw httpError(400, 'Invalid Firebase installation id');
+        const token = String(body.token || '').trim();
+        if (!token || token.length < 20 || token.length > 4096) throw httpError(400, 'Invalid FCM registration token');
         const payload = await verifyHandle(env, handle);
         if (payload.install !== installId) throw httpError(403, 'Connection does not belong to this installation');
         if (payload.phase !== 'session' || !payload.sid) throw httpError(409, 'Bank connection is not authorized yet');
@@ -205,7 +205,7 @@ export default {
           body: {
             installId,
             bankHandle: handle,
-            fid,
+            token,
             platform: String(body.platform || 'android'),
             language: String(body.language || 'et').toLowerCase() === 'en' ? 'en' : 'et',
             notifications,
@@ -690,7 +690,7 @@ async function runPushPoll(env) {
 
 async function pollOneRegistration(env, registration) {
   const now = Date.now();
-  if (!registration?.installId || !registration?.bankHandle || !registration?.fid) return;
+  if (!registration?.installId || !registration?.bankHandle || !registration?.token) return;
   if (Number(registration.nextPollAt || 0) > now) return;
 
   const payload = await verifyHandle(env, String(registration.bankHandle));
@@ -801,7 +801,7 @@ async function sendBankPush(env, registration, tx, accountName) {
     body = [accountName, merchant].filter(Boolean).join(' · ') || (et ? 'Pangatehing' : 'Bank transaction');
   }
 
-  await sendFcm(env, registration.fid, {
+  await sendFcm(env, registration.token, {
     title,
     body,
     data: {
@@ -814,11 +814,11 @@ async function sendBankPush(env, registration, tx, accountName) {
   });
 }
 
-async function sendFcm(env, fid, payload) {
+async function sendFcm(env, token, payload) {
   const service = firebaseServiceAccount(env);
   const accessToken = await firebaseAccessToken(env, service);
   const message = {
-    fid,
+    token,
     notification: { title: payload.title, body: payload.body },
     data: Object.fromEntries(Object.entries(payload.data || {}).map(([k, v]) => [k, String(v ?? '')])),
     android: {

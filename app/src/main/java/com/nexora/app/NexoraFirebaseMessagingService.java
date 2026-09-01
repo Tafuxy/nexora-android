@@ -7,15 +7,9 @@ import java.util.Map;
 
 public class NexoraFirebaseMessagingService extends FirebaseMessagingService {
     @Override
-    public void onRegistered(String installationId) {
-        super.onRegistered(installationId);
-        PushRegistration.saveFid(this, installationId);
-    }
-
-    @Override
-    public void onUnregistered(String installationId) {
-        super.onUnregistered(installationId);
-        PushRegistration.clearFid(this, installationId);
+    public void onNewToken(String token) {
+        super.onNewToken(token);
+        PushRegistration.saveToken(this, token);
     }
 
     @Override
