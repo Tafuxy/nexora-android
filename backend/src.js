@@ -13,7 +13,7 @@ export default {
       if (url.pathname === '/health') {
         return json({
           ok: true,
-          version: '10.0.0',
+          version: '10.1.0',
           provider: 'enable-banking',
           configured: configured(env),
           mode: 'linked-accounts-compatible',

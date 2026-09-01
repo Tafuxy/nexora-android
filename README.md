@@ -1,6 +1,6 @@
-# Nexora V10
+# Nexora V10.1
 
-Nexora V10 is a long-term reliability and usability release for the Android and iOS personal finance, planning and vehicle app.
+Nexora V10.1 is a long-term reliability and usability release for the Android and iOS personal finance, planning and vehicle app.
 
 ## V10 highlights
 - Bank sync keeps the last trustworthy balance when a bank temporarily returns missing or partial account data.
@@ -15,7 +15,17 @@ Nexora V10 is a long-term reliability and usability release for the Android and 
 - Tasks can have reminders. Android uses local alarms and restores them after reboot; iOS schedules local notifications.
 - Local app state keeps a previous valid snapshot so a damaged primary localStorage payload does not force the app to start empty.
 - Disconnecting a bank also removes its server-side push registration when possible.
-- Android and iOS versioning is unified at **10.0.0** / build **26**.
+- Android and iOS versioning is unified at **10.1.0** / build **27**.
+
+## Savings redesign (10.1)
+- Replaced the old pair of raw “current savings / savings goal” numbers with a goal-first savings experience.
+- Savings goals ask only what you are saving for, how much you need, and optionally by when.
+- Each goal shows progress, amount left, forecast, and a calculated monthly saving suggestion.
+- Manual goals support “add money” and “take from savings” without creating fake income/expense transactions.
+- A goal can be linked to a connected bank account; its balance then comes from bank sync automatically.
+- Transfers between the user's own current/savings accounts remain excluded from income and expense statistics.
+- The Savings overview shows total saved and the net change this month.
+- Legacy V10 savings numbers migrate automatically into a normal savings goal.
 
 ## Bank backend
 The Cloudflare Worker in `backend/` must be deployed when `backend/src.js` changes. Required secrets and routes are documented in `backend/README.md`.
@@ -27,5 +37,5 @@ The GitHub Actions workflow `.github/workflows/build-apk.yml` builds the Android
 The GitHub Actions workflow `.github/workflows/build-ios.yml` syncs the shared web UI into the iOS bundle, generates the Xcode project with XcodeGen and builds an unsigned IPA.
 
 ## Release
-Version: **10.0.0**  
-Android versionCode / iOS build: **26**
+Version: **10.1.0**  
+Android versionCode / iOS build: **27**

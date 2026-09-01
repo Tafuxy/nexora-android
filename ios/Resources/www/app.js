@@ -22,7 +22,7 @@ const icons = {
 
 const translations = {
   et: {
-    pages: { home: 'Avaleht', planner: 'Plaanid', money: 'Raha', bills: 'Arved', garage: 'Garaaž', profile: 'Seaded' },
+    pages: { home: 'Avaleht', planner: 'Plaanid', money: 'Raha', savings: 'Säästud', bills: 'Arved', garage: 'Garaaž', profile: 'Seaded' },
     nav: { home: 'Avaleht', planner: 'Plaanid', money: 'Raha', bills: 'Arved', garage: 'Garaaž', profile: 'Seaded' },
     dateLongOptions: { weekday: 'long', day: 'numeric', month: 'long' },
     dateShortOptions: { day: '2-digit', month: 'short' },
@@ -243,7 +243,7 @@ const translations = {
     }
   },
   en: {
-    pages: { home: 'Home', planner: 'Planner', money: 'Money', bills: 'Bills', garage: 'Garage', profile: 'Settings' },
+    pages: { home: 'Home', planner: 'Planner', money: 'Money', savings: 'Savings', bills: 'Bills', garage: 'Garage', profile: 'Settings' },
     nav: { home: 'Home', planner: 'Planner', money: 'Money', bills: 'Bills', garage: 'Garage', profile: 'Settings' },
     dateLongOptions: { weekday: 'long', day: 'numeric', month: 'long' },
     dateShortOptions: { day: '2-digit', month: 'short' },
@@ -603,13 +603,14 @@ function o(key) {
 const cleanDefaults = {
   settings: { language: '', interests: [], ownAccountIbans: [], requireAuth: true, biometricEnabled: false, notifications: { moneyReceived: true, moneySpent: true, tasks: true, bills: true, vehicles: true, budget: true, privacy: 'hideAmount' } },
   profile: { name: '', monthlyBudget: 0, monthlyIncome: 0, savingsGoal: 0, savingsCurrent: 0 },
+  savings: { goals: [], movements: [] },
   tasks: [],
   taskHistory: [],
   transactions: [],
   bills: [],
   vehicles: [],
   bank: { installId: '', handle: '', connected: false, institutionId: '', accounts: [], lastGoodAccounts: [], lastSync: '', syncStatus: '', syncWarning: '', reauthorizationRequired: false, lastTotalBalance: null },
-  meta: { firstOpen: true, setupComplete: false, appVersion: '10.0.0', schemaVersion: 10 }
+  meta: { firstOpen: true, setupComplete: false, appVersion: '10.1.0', schemaVersion: 11 }
 };
 
 const DEMO_TASKS = ['Review today’s priorities', 'Check upcoming car costs'];
@@ -677,6 +678,33 @@ function sanitizeState(input) {
   s.profile.monthlyIncome = Number(s.profile.monthlyIncome || 0);
   s.profile.savingsGoal = Number(s.profile.savingsGoal || 0);
   s.profile.savingsCurrent = Number(s.profile.savingsCurrent || 0);
+  s.savings = deepMerge(cleanDefaults.savings, s.savings || {});
+  s.savings.goals = Array.isArray(s.savings.goals) ? s.savings.goals.map(goal => ({
+    id: String(goal?.id || uid()),
+    title: String(goal?.title || (s.settings?.language === 'en' ? 'Savings goal' : 'Säästud')).trim(),
+    target: Math.max(0, Number(goal?.target || 0)),
+    manualAmount: Math.max(0, Number(goal?.manualAmount ?? goal?.current ?? 0)),
+    targetDate: String(goal?.targetDate || ''),
+    linkedAccountId: String(goal?.linkedAccountId || ''),
+    createdAt: String(goal?.createdAt || new Date().toISOString()),
+    archived: Boolean(goal?.archived)
+  })) : [];
+  s.savings.movements = Array.isArray(s.savings.movements) ? s.savings.movements.map(item => ({
+    id: String(item?.id || uid()), goalId: String(item?.goalId || ''), delta: Number(item?.delta || 0),
+    date: String(item?.date || todayISO()), note: String(item?.note || ''), createdAt: String(item?.createdAt || new Date().toISOString())
+  })).filter(item => item.goalId && Number.isFinite(item.delta) && item.delta !== 0) : [];
+  // Migrate the old two-number savings setup into one understandable goal.
+  if (!s.savings.goals.length && (s.profile.savingsGoal > 0 || s.profile.savingsCurrent > 0)) {
+    s.savings.goals.push({
+      id: uid(), title: s.settings?.language === 'en' ? 'My savings' : 'Minu säästud',
+      target: Math.max(0, s.profile.savingsGoal), manualAmount: Math.max(0, s.profile.savingsCurrent),
+      targetDate: '', linkedAccountId: '', createdAt: new Date().toISOString(), archived: false
+    });
+  }
+  // Legacy fields are no longer authoritative. Clear them after migration so deleting
+  // a savings goal cannot make an old hidden goal reappear on the next launch.
+  s.profile.savingsGoal = 0;
+  s.profile.savingsCurrent = 0;
   s.tasks = Array.isArray(s.tasks) ? s.tasks.map(task => ({ ...task, repeat: ['daily','weekly','monthly'].includes(task?.repeat) ? task.repeat : 'none', reminder: task?.reminder !== false })) : [];
   s.taskHistory = Array.isArray(s.taskHistory) ? s.taskHistory.map(item => ({ ...item, historyId: item?.historyId || uid(), done: true })) : [];
   // Migrate completed one-off tasks from older builds into a real history so the active
@@ -715,7 +743,7 @@ function sanitizeState(input) {
   s.bank.lastGoodAccounts = Array.isArray(s.bank.lastGoodAccounts) ? s.bank.lastGoodAccounts : [];
   s.bank.installId = String(s.bank.installId || '');
   if (!s.bank.installId) s.bank.installId = `install-${uid()}`;
-  s.meta = { ...(s.meta || {}), appVersion: '10.0.0', schemaVersion: 10, firstOpen: Boolean(s.meta?.firstOpen), setupComplete: Boolean(s.meta?.setupComplete) };
+  s.meta = { ...(s.meta || {}), appVersion: '10.1.0', schemaVersion: 11, firstOpen: Boolean(s.meta?.firstOpen), setupComplete: Boolean(s.meta?.setupComplete) };
   return s;
 }
 
@@ -882,7 +910,7 @@ function setupMarkup() {
     body = `<div class="setup-card">
       <h2>${o('setup2Title')}</h2><p>${o('setup2Text')}</p>
       <div class="grid-2"><div class="field"><label>${o('monthlyIncome')}</label><input id="setupIncome" type="number" inputmode="decimal" min="0" step="0.01" value="${esc((setupDraft.monthlyIncome ?? state.profile.monthlyIncome) || '')}" placeholder="0"></div><div class="field"><label>${o('monthlyBudget')}</label><input id="setupBudget" type="number" inputmode="decimal" min="0" step="0.01" value="${esc((setupDraft.monthlyBudget ?? state.profile.monthlyBudget) || '')}" placeholder="0"></div></div>
-      <div class="grid-2"><div class="field"><label>${o('currentSavings')}</label><input id="setupSavingsCurrent" type="number" inputmode="decimal" min="0" step="0.01" value="${esc((setupDraft.savingsCurrent ?? state.profile.savingsCurrent) || '')}" placeholder="0"></div><div class="field"><label>${o('savingsGoal')}</label><input id="setupSavingsGoal" type="number" inputmode="decimal" min="0" step="0.01" value="${esc((setupDraft.savingsGoal ?? state.profile.savingsGoal) || '')}" placeholder="0"></div></div>
+      <div class="setup-note"><b>${savingsText('setupTitle')}</b><span>${savingsText('setupLater')}</span></div>
     </div>`;
   } else if (setupStep === 3) {
     const existing = state.vehicles[0] || {};
@@ -926,8 +954,6 @@ function saveCurrentSetupStep() {
   } else if (setupStep === 2) {
     setupDraft.monthlyIncome = Number($('#setupIncome')?.value || 0);
     setupDraft.monthlyBudget = Number($('#setupBudget')?.value || 0);
-    setupDraft.savingsCurrent = Number($('#setupSavingsCurrent')?.value || 0);
-    setupDraft.savingsGoal = Number($('#setupSavingsGoal')?.value || 0);
   } else if (setupStep === 3) {
     setupDraft.vehicleName = String($('#setupVehicleName')?.value || '').trim();
     setupDraft.plate = String($('#setupPlate')?.value || '').trim();
@@ -954,8 +980,6 @@ function finishSetup() {
   state.profile.name = setupDraft.name || state.profile.name || '';
   state.profile.monthlyIncome = Number(setupDraft.monthlyIncome || 0);
   state.profile.monthlyBudget = Number(setupDraft.monthlyBudget || 0);
-  state.profile.savingsCurrent = Number(setupDraft.savingsCurrent || 0);
-  state.profile.savingsGoal = Number(setupDraft.savingsGoal || 0);
 
   if (setupDraft.vehicleName) {
     const vehicle = {
@@ -1118,8 +1142,8 @@ function applyNavLabels() {
 
 function hasAnyData() {
   return Boolean(
-    state.tasks.length || state.transactions.length || state.bills.length || state.vehicles.length ||
-    state.profile.monthlyBudget || state.profile.monthlyIncome || state.profile.savingsGoal || state.profile.savingsCurrent || state.profile.name
+    state.tasks.length || state.transactions.length || state.bills.length || state.vehicles.length || savingsGoals().length ||
+    state.profile.monthlyBudget || state.profile.monthlyIncome || state.profile.name
   );
 }
 
@@ -1737,6 +1761,13 @@ async function disconnectBank() {
       });
     }
   } catch {}
+  // Keep a linked savings goal understandable even after the user disconnects the bank.
+  for (const goal of savingsGoals()) {
+    if (goal.linkedAccountId) {
+      goal.manualAmount = savingsGoalAmount(goal);
+      goal.linkedAccountId = '';
+    }
+  }
   state.bank.handle = '';
   state.bank.connected = false;
   state.bank.institutionId = '';
@@ -1767,6 +1798,239 @@ function homeQuickActions(firstVehicle) {
   }).join('');
 }
 
+
+
+function savingsText(key) {
+  const et = {
+    title: 'Säästud', totalSaved: 'Kokku säästetud', thisMonth: 'sel kuul', open: 'Ava säästud', view: 'Vaata',
+    newGoal: 'Uus eesmärk', createFirst: 'Loo esimene eesmärk', emptyTitle: 'Tee säästmine lihtsaks',
+    emptyText: 'Pane kirja, mille jaoks kogud ja kui palju vaja. Nexora arvutab ülejäänu sinu eest.',
+    goalName: 'Mille jaoks kogud?', goalNamePlaceholder: 'Näiteks uus auto', targetAmount: 'Kui palju vaja?',
+    targetDate: 'Mis ajaks? (soovi korral)', current: 'Säästetud', left: 'Veel puudu', completed: 'Eesmärk täidetud',
+    monthlySuggestion: 'Soovitus', perMonth: '/ kuu', forecast: 'Prognoos', noForecast: 'Lisa tähtaeg, et Nexora arvutaks sobiva kuukoguse.',
+    addMoney: 'Lisa raha', takeMoney: 'Võta säästudest', manage: 'Halda eesmärki', saveGoal: 'Salvesta eesmärk',
+    accountLink: 'Seosta pangakontoga', noAccount: 'Ära seo pangakontoga', accountHint: 'Kui seod säästukonto, tuleb selle eesmärgi saldo pangast automaatselt.',
+    syncedFromBank: 'Saldo tuleb pangast automaatselt', syncBank: 'Sünk pangast', manualBalance: 'Käsitsi jälgitav saldo',
+    movementType: 'Mida teed?', deposit: 'Lisan säästudesse', withdraw: 'Võtan säästudest', movementAmount: 'Summa',
+    movementNote: 'Märkus (soovi korral)', withdrawReason: 'Näiteks mille jaoks raha võtsid', saveMovement: 'Salvesta',
+    deleteGoal: 'Kustuta eesmärk', deleteConfirm: 'Kas kustutan selle säästueesmärgi?', invalidTarget: 'Sisesta eesmärgi summa.',
+    invalidAmount: 'Sisesta korrektne summa.', goalReached: 'Valmis', backToMoney: 'Raha',
+    internalInfoTitle: 'Oma kontode vahel raha liigutamine ei ole kulu ega tulu',
+    internalInfoText: 'Arvelduskontolt säästukontole ja tagasi liikumised jäävad tulu/kulu statistikast välja. Päris intress või muu väljast laekumine jääb tuluks.',
+    setupTitle: 'Säästud saad lisada hiljem ühe eesmärgina.', setupLater: 'Sa ei pea siin kahte segast säästunumbrit sisestama. Pärast seadistamist küsib Nexora ainult: mille jaoks, kui palju ja mis ajaks.',
+    profileHint: 'Eesmärgid ja säästukontod', savedOf: 'säästetud', reachedOn: 'eesmärk on koos',
+    targetPast: 'Tähtaeg on möödas', paceNeeded: 'Vajalik tempo', bankAccountUsed: 'Seotud konto',
+    editGoal: 'Muuda eesmärki', initialSaved: 'Praegu säästetud', initialSavedHint: 'Kui sa ei seo pangakontot, saad saldot siin käsitsi muuta.',
+    linkLater: 'Pangakonto saad soovi korral pärast loomist eesmärgiga siduda.'
+  };
+  const en = {
+    title: 'Savings', totalSaved: 'Total saved', thisMonth: 'this month', open: 'Open savings', view: 'View',
+    newGoal: 'New goal', createFirst: 'Create first goal', emptyTitle: 'Make saving simple',
+    emptyText: 'Tell Nexora what you are saving for and how much you need. Nexora handles the maths.',
+    goalName: 'What are you saving for?', goalNamePlaceholder: 'For example, a new car', targetAmount: 'How much do you need?',
+    targetDate: 'By when? (optional)', current: 'Saved', left: 'Left to save', completed: 'Goal completed',
+    monthlySuggestion: 'Suggestion', perMonth: '/ month', forecast: 'Forecast', noForecast: 'Add a target date so Nexora can calculate a suitable monthly amount.',
+    addMoney: 'Add money', takeMoney: 'Take from savings', manage: 'Manage goal', saveGoal: 'Save goal',
+    accountLink: 'Link bank account', noAccount: 'Do not link a bank account', accountHint: 'Link a savings account and the goal balance will come from your bank automatically.',
+    syncedFromBank: 'Balance syncs automatically from your bank', syncBank: 'Sync bank', manualBalance: 'Manually tracked balance',
+    movementType: 'What are you doing?', deposit: 'Add to savings', withdraw: 'Take from savings', movementAmount: 'Amount',
+    movementNote: 'Note (optional)', withdrawReason: 'For example, what you used the money for', saveMovement: 'Save',
+    deleteGoal: 'Delete goal', deleteConfirm: 'Delete this savings goal?', invalidTarget: 'Enter a target amount.',
+    invalidAmount: 'Enter a valid amount.', goalReached: 'Complete', backToMoney: 'Money',
+    internalInfoTitle: 'Moving money between your own accounts is not income or spending',
+    internalInfoText: 'Transfers between your current and savings accounts stay out of income/expense statistics. Real interest or other outside income still counts as income.',
+    setupTitle: 'You can add savings later as a simple goal.', setupLater: 'No need to enter two confusing savings numbers here. After setup Nexora only asks what for, how much, and by when.',
+    profileHint: 'Goals and savings accounts', savedOf: 'saved', reachedOn: 'goal reached',
+    targetPast: 'Target date has passed', paceNeeded: 'Required pace', bankAccountUsed: 'Linked account',
+    editGoal: 'Edit goal', initialSaved: 'Currently saved', initialSavedHint: 'If no bank account is linked, you can update this balance manually.',
+    linkLater: 'You can link a bank account to the goal after creating it.'
+  };
+  return (lang() === 'et' ? et : en)[key] || key;
+}
+
+function savingsGoals() {
+  return (state.savings?.goals || []).filter(goal => !goal.archived);
+}
+
+function savingsBankAccount(goal) {
+  const id = String(goal?.linkedAccountId || '');
+  if (!id) return null;
+  return [...(state.bank.accounts || []), ...(state.bank.lastGoodAccounts || [])].find(account => String(account?.id || '') === id) || null;
+}
+
+function savingsGoalAmount(goal) {
+  const account = savingsBankAccount(goal);
+  const balance = nullableMoneyNumber(account?.balance);
+  if (goal?.linkedAccountId && balance !== null) return Math.max(0, balance);
+  return Math.max(0, Number(goal?.manualAmount || 0));
+}
+
+function savingsTotal() {
+  const seenAccounts = new Set();
+  return savingsGoals().reduce((sum, goal) => {
+    const accountId = String(goal.linkedAccountId || '');
+    if (accountId) {
+      if (seenAccounts.has(accountId)) return sum;
+      seenAccounts.add(accountId);
+    }
+    return sum + savingsGoalAmount(goal);
+  }, 0);
+}
+
+function savingsMonthlyMovement(goalId = '') {
+  const month = currentMonthKey();
+  const goal = goalId ? savingsGoals().find(item => item.id === goalId) : null;
+  const targetGoals = goal ? [goal] : savingsGoals();
+  let total = 0;
+  const linkedIds = new Set(targetGoals.map(item => String(item.linkedAccountId || '')).filter(Boolean));
+  if (linkedIds.size) {
+    total += state.transactions.filter(tx => tx.source === 'bank' && !tx.pending && String(tx.date || '').startsWith(month) && linkedIds.has(String(tx.bankAccountId || '')))
+      .reduce((sum, tx) => sum + (tx.type === 'income' ? 1 : -1) * Number(tx.amount || 0), 0);
+  }
+  const manualIds = new Set(targetGoals.filter(item => !item.linkedAccountId).map(item => item.id));
+  total += (state.savings?.movements || []).filter(item => manualIds.has(item.goalId) && String(item.date || '').startsWith(month))
+    .reduce((sum, item) => sum + Number(item.delta || 0), 0);
+  return total;
+}
+
+function savingsGoalStats(goal) {
+  const current = savingsGoalAmount(goal);
+  const target = Math.max(0, Number(goal.target || 0));
+  const remaining = Math.max(0, target - current);
+  const pct = target > 0 ? Math.min(100, Math.max(0, current / target * 100)) : 0;
+  let monthlyNeeded = null;
+  let forecast = '';
+  if (remaining <= 0 && target > 0) {
+    forecast = savingsText('completed');
+  } else if (goal.targetDate) {
+    const end = new Date(`${goal.targetDate}T12:00:00`);
+    const days = Math.ceil((end.getTime() - Date.now()) / 86400000);
+    if (days < 0) forecast = savingsText('targetPast');
+    else {
+      const months = Math.max(1, Math.ceil(days / 30.4375));
+      monthlyNeeded = remaining / months;
+      forecast = new Intl.DateTimeFormat(locale(), { month: 'long', year: 'numeric' }).format(end);
+    }
+  } else {
+    const pace = savingsMonthlyMovement(goal.id);
+    if (pace > 0 && remaining > 0) {
+      const months = Math.max(1, Math.ceil(remaining / pace));
+      const eta = new Date();
+      eta.setMonth(eta.getMonth() + months);
+      forecast = new Intl.DateTimeFormat(locale(), { month: 'long', year: 'numeric' }).format(eta);
+    }
+  }
+  return { current, target, remaining, pct, monthlyNeeded, forecast };
+}
+
+function savingsGoalCard(goal) {
+  const st = savingsGoalStats(goal);
+  const account = savingsBankAccount(goal);
+  return `<section class="card savings-goal-card">
+    <div class="savings-goal-head"><div><div class="savings-goal-name">${esc(goal.title)}</div><div class="small muted">${account ? `${savingsText('bankAccountUsed')}: ${esc(bankAccountDisplayName(account))}` : savingsText('manualBalance')}</div></div><span class="pill ${st.remaining <= 0 && st.target > 0 ? 'good' : ''}">${Math.round(st.pct)}%</span></div>
+    <div class="savings-goal-amount"><strong>${money(st.current)}</strong><span>/ ${money(st.target)}</span></div>
+    <div class="progress savings-progress"><span style="width:${st.pct}%"></span></div>
+    <div class="savings-goal-meta"><div><span>${st.remaining <= 0 ? savingsText('completed') : savingsText('left')}</span><strong>${st.remaining <= 0 ? '✓' : money(st.remaining)}</strong></div><div><span>${savingsText('forecast')}</span><strong>${esc(st.forecast || '—')}</strong></div></div>
+    ${st.monthlyNeeded !== null && st.remaining > 0 ? `<div class="savings-suggestion"><span>${savingsText('monthlySuggestion')}</span><strong>${money(st.monthlyNeeded)} ${savingsText('perMonth')}</strong></div>` : (!goal.targetDate && st.remaining > 0 ? `<div class="small muted savings-helper">${savingsText('noForecast')}</div>` : '')}
+    ${account ? `<div class="savings-bank-note">✓ ${savingsText('syncedFromBank')}</div>` : ''}
+    <div class="actions savings-actions">${account ? `<button class="primary" data-savings-sync>${savingsText('syncBank')}</button>` : `<button class="primary" data-adjust-savings="${goal.id}" data-adjust-kind="deposit">${savingsText('addMoney')}</button><button class="secondary" data-adjust-savings="${goal.id}" data-adjust-kind="withdraw">${savingsText('takeMoney')}</button>`}<button class="secondary" data-manage-savings="${goal.id}">${savingsText('manage')}</button></div>
+  </section>`;
+}
+
+function savingsSummaryCardMarkup(compact = false) {
+  const goals = savingsGoals();
+  const total = savingsTotal();
+  const movement = savingsMonthlyMovement();
+  const first = goals[0];
+  const st = first ? savingsGoalStats(first) : null;
+  return `<section class="card savings-entry-card ${compact ? 'compact-savings' : ''}">
+    <div class="section-title"><h3>${savingsText('title')}</h3><button class="ghost" data-open-savings>${goals.length ? savingsText('view') : savingsText('createFirst')}</button></div>
+    <div class="savings-entry-main"><div><div class="savings-entry-amount" data-money-key="savings-total" data-money-value="${Number(total)}">${money(total)}</div><div class="small ${movement >= 0 ? 'money-pos' : 'money-neg'}">${movement >= 0 ? '+' : ''}${money(movement)} ${savingsText('thisMonth')}</div></div>${first ? `<div class="savings-mini-pct">${Math.round(st.pct)}%</div>` : ''}</div>
+    ${first ? `<div class="savings-mini-goal"><span>${esc(first.title)}</span><strong>${money(st.current)} / ${money(st.target)}</strong></div><div class="progress"><span style="width:${st.pct}%"></span></div>` : `<div class="small muted">${savingsText('emptyText')}</div>`}
+  </section>`;
+}
+
+function openSavingsView() {
+  currentView = 'savings';
+  $$('.nav-item').forEach(btn => btn.classList.toggle('active', btn.dataset.view === 'money'));
+  render();
+  setTimeout(() => requestAutoSync(60000), 120);
+}
+
+function backToMoneyView() {
+  currentView = 'money';
+  $$('.nav-item').forEach(btn => btn.classList.toggle('active', btn.dataset.view === 'money'));
+  render();
+}
+
+function openSavingsGoal(goalId = '') {
+  const goal = savingsGoals().find(item => item.id === goalId) || null;
+  const used = new Set(savingsGoals().filter(item => item.id !== goalId).map(item => String(item.linkedAccountId || '')).filter(Boolean));
+  const accounts = (state.bank.accounts || []).filter(account => !used.has(String(account.id || '')) || String(account.id || '') === String(goal?.linkedAccountId || ''));
+  const accountField = goal ? `<div class="field"><label>${savingsText('accountLink')}</label><select name="linkedAccountId"><option value="">${savingsText('noAccount')}</option>${accounts.map(account => `<option value="${esc(account.id)}" ${String(goal.linkedAccountId || '') === String(account.id || '') ? 'selected' : ''}>${esc(bankAccountDisplayName(account))} · ${esc(bankAccountMeta(account))}</option>`).join('')}</select><div class="field-hint">${savingsText('accountHint')}</div></div>` : `<div class="setup-note"><span>${savingsText('linkLater')}</span></div>`;
+  showModal(modalForm(goal ? savingsText('editGoal') : savingsText('newGoal'), `
+    <div class="field"><label>${savingsText('goalName')}</label><input name="title" maxlength="80" value="${esc(goal?.title || '')}" placeholder="${savingsText('goalNamePlaceholder')}" required></div>
+    <div class="field"><label>${savingsText('targetAmount')}</label><input name="target" type="number" inputmode="decimal" min="0.01" step="0.01" value="${goal?.target || ''}" placeholder="10000" required></div>
+    <div class="field"><label>${savingsText('targetDate')}</label><input name="targetDate" type="date" value="${esc(goal?.targetDate || '')}"></div>
+    ${!goal ? `<div class="field"><label>${savingsText('initialSaved')}</label><input name="manualAmount" type="number" inputmode="decimal" min="0" step="0.01" value="0" placeholder="0"><div class="field-hint">${savingsText('initialSavedHint')}</div></div>` : ''}
+    ${accountField}
+    ${goal ? `<button type="button" class="danger savings-delete-wide" data-delete-savings="${goal.id}">${savingsText('deleteGoal')}</button>` : ''}
+  `, savingsText('saveGoal')));
+  $('[data-delete-savings]')?.addEventListener('click', () => {
+    if (!confirm(savingsText('deleteConfirm'))) return;
+    const id = goal.id;
+    state.savings.goals = state.savings.goals.filter(item => item.id !== id);
+    state.savings.movements = state.savings.movements.filter(item => item.goalId !== id);
+    closeModal();
+    saveState();
+  });
+  $('#modalForm').onsubmit = e => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const target = Number(f.get('target') || 0);
+    if (!(target > 0)) { alert(savingsText('invalidTarget')); return; }
+    if (goal) {
+      const nextLinkedAccountId = String(f.get('linkedAccountId') || '');
+      if (goal.linkedAccountId && nextLinkedAccountId !== String(goal.linkedAccountId || '')) {
+        goal.manualAmount = savingsGoalAmount(goal);
+      }
+      goal.title = String(f.get('title') || '').trim();
+      goal.target = target;
+      goal.targetDate = String(f.get('targetDate') || '');
+      goal.linkedAccountId = nextLinkedAccountId;
+    } else {
+      state.savings.goals.push({ id: uid(), title: String(f.get('title') || '').trim(), target, manualAmount: Math.max(0, Number(f.get('manualAmount') || 0)), targetDate: String(f.get('targetDate') || ''), linkedAccountId: '', createdAt: new Date().toISOString(), archived: false });
+    }
+    closeModal();
+    state.meta.firstOpen = false;
+    saveState();
+  };
+}
+
+function openSavingsAdjustment(goalId, initialType = 'deposit') {
+  const goal = savingsGoals().find(item => item.id === goalId);
+  if (!goal || goal.linkedAccountId) return;
+  showModal(modalForm(savingsText('title'), `
+    <div class="savings-adjust-balance"><span>${esc(goal.title)}</span><strong>${money(savingsGoalAmount(goal))}</strong></div>
+    <div class="field"><label>${savingsText('movementType')}</label><select name="movementType"><option value="deposit" ${initialType==='deposit'?'selected':''}>${savingsText('deposit')}</option><option value="withdraw" ${initialType==='withdraw'?'selected':''}>${savingsText('withdraw')}</option></select></div>
+    <div class="field"><label>${savingsText('movementAmount')}</label><input name="amount" type="number" inputmode="decimal" min="0.01" step="0.01" required></div>
+    <div class="field"><label>${savingsText('movementNote')}</label><input name="note" maxlength="120" placeholder="${savingsText('withdrawReason')}"></div>
+  `, savingsText('saveMovement')));
+  $('#modalForm').onsubmit = e => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const amount = Number(f.get('amount') || 0);
+    if (!(amount > 0)) { alert(savingsText('invalidAmount')); return; }
+    const withdraw = String(f.get('movementType') || '') === 'withdraw';
+    const before = savingsGoalAmount(goal);
+    const actual = withdraw ? -Math.min(before, amount) : amount;
+    if (actual === 0) { closeModal(); return; }
+    goal.manualAmount = Math.max(0, before + actual);
+    state.savings.movements.push({ id: uid(), goalId: goal.id, delta: actual, date: todayISO(), note: String(f.get('note') || '').trim(), createdAt: new Date().toISOString() });
+    closeModal();
+    saveState();
+  };
+}
 
 function internalTransferText(key) {
   const et = {
@@ -1965,6 +2229,7 @@ const views = {
         <section class="card kpi"><div class="label">${f('totalExpenses')}</div><div class="value money-neg" data-money-key="home-spend" data-money-value="${Number(spentThisMonth())}">${money(spentThisMonth())}</div><div class="delta muted">${t('thisMonth')}</div></section>
         <section class="card kpi accent-card"><div class="label">${f('freeMoney')}</div><div class="value ${incomeThisMonth()-spentThisMonth()>=0?'money-pos':'money-neg'}" data-money-key="home-free" data-money-value="${Number(incomeThisMonth()-spentThisMonth())}">${money(incomeThisMonth()-spentThisMonth())}</div><div class="delta muted">${t('thisMonth')}</div></section>
       </div>
+      ${savingsGoals().length ? savingsSummaryCardMarkup(true) : ''}
       <div class="section-title"><h3>${t('upNext')}</h3><button class="ghost" data-go="planner">${t('seeAll')}</button></div>
       <section class="card"><div class="list">${tasks.length ? tasks.map(taskRow).join('') : `<div class="empty">${t('noUrgent')}</div>`}</div></section>
       <div class="section-title"><h3>${t('smartInsights')}</h3></div>
@@ -1995,6 +2260,7 @@ const views = {
 
     return `<div class="stack">
       ${bankCardMarkup()}
+      ${savingsSummaryCardMarkup()}
       <section class="card finance-hero ${statusBad ? 'finance-danger' : ''}">
         <div class="hero-kicker">${t('monthlyStatus')}</div>
         <div class="finance-balance-label">${t('availableMoney')}</div>
@@ -2044,6 +2310,23 @@ const views = {
     </div>`;
   },
 
+
+  savings() {
+    const goals = savingsGoals();
+    const total = savingsTotal();
+    const movement = savingsMonthlyMovement();
+    return `<div class="stack savings-view">
+      <div class="savings-view-toolbar"><button class="ghost savings-back" data-savings-back>‹ ${savingsText('backToMoney')}</button><button class="secondary compact-add" data-add-savings-goal>${savingsText('newGoal')}</button></div>
+      <section class="card savings-hero-card">
+        <div class="hero-kicker">${savingsText('totalSaved')}</div>
+        <div class="savings-hero-total" data-money-key="savings-view-total" data-money-value="${Number(total)}">${money(total)}</div>
+        <div class="savings-hero-month ${movement >= 0 ? 'money-pos' : 'money-neg'}">${movement >= 0 ? '+' : ''}${money(movement)} ${savingsText('thisMonth')}</div>
+      </section>
+      ${goals.length ? `<div class="section-title"><h3>${savingsText('title')}</h3><span class="pill">${goals.length}</span></div>${goals.map(savingsGoalCard).join('')}` : `<section class="card savings-empty"><div class="empty-icon">◎</div><h3>${savingsText('emptyTitle')}</h3><p>${savingsText('emptyText')}</p><button class="primary" data-add-savings-goal>${savingsText('createFirst')}</button></section>`}
+      <section class="card soft savings-info-card"><b>${savingsText('internalInfoTitle')}</b><span class="small muted">${savingsText('internalInfoText')}</span></section>
+    </div>`;
+  },
+
   bills() {
     const total = monthlyBillsTotal();
     const paid = paidBillsThisMonth();
@@ -2086,7 +2369,7 @@ const views = {
       <section class="card brand-card">
         <img class="brand-wordmark dark-logo" src="nexora-wordmark-dark.png" alt="Nexora" />
         <img class="brand-wordmark light-logo" src="nexora-wordmark-light.png" alt="Nexora" />
-        <div class="brand-version">Nexora · 10.0.0</div>
+        <div class="brand-version">Nexora · 10.1.0</div>
       </section>
       <section class="card">
         <div class="section-title"><h3>${t('statistics')}</h3></div>
@@ -2104,8 +2387,11 @@ const views = {
         <div class="statline"><span>${t('name')}</span><strong>${esc(p.name || '—')}</strong></div>
         <div class="statline"><span>${t('expectedIncome')}</span><strong>${money(p.monthlyIncome)}</strong></div>
         <div class="statline"><span>${t('monthlyBudget')}</span><strong>${money(p.monthlyBudget)}</strong></div>
-        <div class="statline"><span>${t('savingsGoal')}</span><strong>${money(p.savingsGoal)}</strong></div>
-        <div class="statline"><span>${t('savedCurrently')}</span><strong>${money(p.savingsCurrent)}</strong></div>
+      </section>
+      <section class="card">
+        <div class="section-title"><h3>${savingsText('title')}</h3><button class="ghost" data-open-savings>${savingsText('open')}</button></div>
+        <div class="statline"><span>${savingsText('totalSaved')}</span><strong>${money(savingsTotal())}</strong></div>
+        <div class="small muted">${savingsText('profileHint')}</div>
       </section>
       <section class="card">
         <div class="section-title"><h3>${t('appSettings')}</h3><button class="ghost" data-open-settings>${t('configure')}</button></div>
@@ -2399,6 +2685,12 @@ function bindTransactionRows() {
 
 function bindView() {
   $$('[data-go]').forEach(btn => btn.onclick = () => $(`.nav-item[data-view="${btn.dataset.go}"]`)?.click());
+  $$('[data-open-savings]').forEach(btn => btn.onclick = openSavingsView);
+  $('[data-savings-back]')?.addEventListener('click', backToMoneyView);
+  $$('[data-add-savings-goal]').forEach(btn => btn.onclick = () => openSavingsGoal(''));
+  $$('[data-manage-savings]').forEach(btn => btn.onclick = () => openSavingsGoal(btn.dataset.manageSavings));
+  $$('[data-adjust-savings]').forEach(btn => btn.onclick = () => openSavingsAdjustment(btn.dataset.adjustSavings, btn.dataset.adjustKind || 'deposit'));
+  $$('[data-savings-sync]').forEach(btn => btn.onclick = () => syncBank(true));
   $$('[data-add]').forEach(btn => btn.onclick = () => openAdd(btn.dataset.add));
   $$('[data-toggle-task]').forEach(btn => btn.onclick = () => {
     const item = state.tasks.find(x => x.id === btn.dataset.toggleTask);
@@ -2663,7 +2955,6 @@ function openProfile() {
   showModal(modalForm(t('setProfile'), `
     <div class="field"><label>${t('name')}</label><input name="name" value="${esc(p.name)}"></div>
     <div class="grid-2"><div class="field"><label>${o('monthlyIncome')}</label><input name="monthlyIncome" type="number" min="0" step="0.01" value="${p.monthlyIncome || 0}"></div><div class="field"><label>${t('monthlyBudget')}</label><input name="monthlyBudget" type="number" min="0" step="0.01" value="${p.monthlyBudget || 0}"></div></div>
-    <div class="grid-2"><div class="field"><label>${t('savingsGoal')}</label><input name="savingsGoal" type="number" min="0" step="0.01" value="${p.savingsGoal || 0}"></div><div class="field"><label>${t('savedCurrently')}</label><input name="savingsCurrent" type="number" min="0" step="0.01" value="${p.savingsCurrent || 0}"></div></div>
   `, t('save')));
   $('#modalForm').onsubmit = e => {
     e.preventDefault();
@@ -2672,9 +2963,7 @@ function openProfile() {
       ...state.profile,
       name: String(f.get('name') || '').trim(),
       monthlyIncome: Number(f.get('monthlyIncome') || 0),
-      monthlyBudget: Number(f.get('monthlyBudget') || 0),
-      savingsGoal: Number(f.get('savingsGoal') || 0),
-      savingsCurrent: Number(f.get('savingsCurrent') || 0)
+      monthlyBudget: Number(f.get('monthlyBudget') || 0)
     };
     state.meta.firstOpen = false;
     closeModal();

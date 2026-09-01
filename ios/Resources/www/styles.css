@@ -522,3 +522,51 @@ body.gated .app-shell,body.gated .bottom-nav{visibility:hidden;pointer-events:no
 .tx-edit-box{display:grid;gap:11px;margin-top:15px;padding:14px;border-radius:17px;background:var(--surface-2);border:1px solid var(--line)}
 .tx-edit-box .toggle-row{margin:0}
 @media(max-width:390px){.category-detail-stats{grid-template-columns:1fr}.category-detail-stats>div{grid-template-columns:1fr auto;align-items:center}}
+
+
+/* Savings 10.1 — simple goal-first experience */
+.setup-note{display:grid;gap:4px;padding:13px 14px;border:1px solid var(--line);border-radius:16px;background:var(--surface-2);font-size:12px;line-height:1.45;color:var(--muted)}
+.setup-note b{color:var(--text);font-size:13px}
+.field-hint{margin-top:6px;color:var(--muted);font-size:11px;line-height:1.4}
+.savings-entry-card{display:grid;gap:13px;background:linear-gradient(145deg,color-mix(in srgb,var(--accent) 9%,var(--surface)),var(--surface) 58%)}
+.savings-entry-card.compact-savings{padding:15px 17px}
+.savings-entry-main{display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
+.savings-entry-amount{font-size:30px;line-height:1;font-weight:820;letter-spacing:-.045em}
+.savings-mini-pct{font-size:21px;font-weight:800;color:var(--accent)}
+.savings-mini-goal{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:11px;color:var(--muted)}
+.savings-mini-goal strong{color:var(--text);font-size:11px}
+.savings-view-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.savings-back{padding-left:2px}
+.savings-hero-card{padding:22px 18px;background:linear-gradient(145deg,color-mix(in srgb,var(--accent) 15%,var(--surface)),var(--surface) 62%)}
+.savings-hero-total{font-size:42px;line-height:1.05;font-weight:850;letter-spacing:-.055em;margin-top:8px}
+.savings-hero-month{font-size:13px;font-weight:750;margin-top:9px}
+.savings-goal-card{display:grid;gap:14px}
+.savings-goal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.savings-goal-name{font-size:19px;font-weight:820;letter-spacing:-.025em;margin-bottom:4px}
+.savings-goal-amount{display:flex;align-items:baseline;gap:6px}
+.savings-goal-amount strong{font-size:28px;letter-spacing:-.04em}
+.savings-goal-amount span{font-size:12px;color:var(--muted);font-weight:700}
+.savings-progress{height:9px}
+.savings-goal-meta{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.savings-goal-meta>div{display:grid;gap:4px;padding:11px 12px;border:1px solid var(--line);background:var(--surface-2);border-radius:14px}
+.savings-goal-meta span{font-size:10px;color:var(--muted);font-weight:700}
+.savings-goal-meta strong{font-size:13px}
+.savings-suggestion{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 13px;border-radius:14px;background:color-mix(in srgb,var(--accent) 9%,var(--surface-2));border:1px solid color-mix(in srgb,var(--accent) 18%,var(--line));font-size:12px}
+.savings-suggestion strong{font-size:14px}
+.savings-helper{line-height:1.45}
+.savings-bank-note{font-size:11px;font-weight:700;color:var(--good)}
+.savings-actions{margin-top:1px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.savings-actions button{min-width:0;padding-left:9px;padding-right:9px}
+.savings-empty{text-align:center;display:grid;gap:11px;justify-items:center;padding:30px 20px}
+.savings-empty h3{margin:0;font-size:22px;letter-spacing:-.035em}
+.savings-empty p{margin:0;max-width:360px;color:var(--muted);font-size:13px;line-height:1.5}
+.savings-info-card{display:grid;gap:7px;line-height:1.45}
+.savings-delete-wide{width:100%;margin-top:4px}
+.savings-adjust-balance{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 14px;border-radius:15px;background:var(--surface-2);border:1px solid var(--line)}
+.savings-adjust-balance span{font-size:12px;color:var(--muted)}
+.savings-adjust-balance strong{font-size:18px}
+@media(max-width:520px){
+  .savings-entry-amount{font-size:27px}
+  .savings-hero-total{font-size:36px}
+  .savings-goal-meta{grid-template-columns:1fr}
+  .savings-actions{grid-template-columns:1fr 1fr}.savings-actions>*:last-child:nth-child(3){grid-column:1/-1}
+}

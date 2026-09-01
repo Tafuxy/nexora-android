@@ -1,4 +1,16 @@
-# Nexora V10 changelog
+# Nexora V10.1 changelog
+
+## Savings — rebuilt for normal people
+- Added a dedicated **Säästud / Savings** view reachable from Money, Home and Settings.
+- Savings goals now use a simple flow: **what for → how much → by when**.
+- Added progress, amount remaining, target forecast and required monthly saving calculation.
+- Added manual “add to savings / take from savings” adjustments that do not pollute income/expense statistics.
+- Added optional bank-account linking per savings goal; linked goals use the synced account balance automatically.
+- Added total savings and this-month savings movement summaries.
+- Removed the confusing raw savings fields from onboarding and profile editing.
+- Existing V10 `savingsCurrent` / `savingsGoal` values migrate automatically into a goal.
+- Own-account transfers stay excluded from income and spending; real external income such as interest remains real income.
+
 
 ## Money & bank sync
 - Added partial-account sync protection and last-trustworthy-balance fallback.
@@ -22,5 +34,5 @@
 
 ## Reliability
 - Added previous-valid-state local backup and recovery.
-- Unified Android/iOS/web release versioning to 10.0.0 (build 26).
+- Unified Android/iOS/web release versioning to 10.1.0 (build 27).
 - Updated legal/privacy copy for task reminders.

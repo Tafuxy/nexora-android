@@ -26,4 +26,4 @@ Push notifications also require the Firebase service-account configuration expec
 - Missing bank balances are treated as unknown, not as zero.
 - Own-account transfers can be excluded from push spend/income events when both endpoints are known.
 - Bank disconnect attempts to remove the installation from the push registry so stale polling does not continue.
-- `/health` reports backend version `10.0.0`.
+- `/health` reports backend version `10.1.0`.
