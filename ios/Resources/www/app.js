@@ -608,7 +608,7 @@ const cleanDefaults = {
   bills: [],
   vehicles: [],
   bank: { installId: '', handle: '', connected: false, institutionId: '', accounts: [], lastGoodAccounts: [], lastSync: '', syncStatus: '', syncWarning: '', reauthorizationRequired: false, lastTotalBalance: null },
-  meta: { firstOpen: true, setupComplete: false, appVersion: '1.8.8' }
+  meta: { firstOpen: true, setupComplete: false, appVersion: '1.8.9' }
 };
 
 const DEMO_TASKS = ['Review today’s priorities', 'Check upcoming car costs'];
@@ -699,7 +699,7 @@ function sanitizeState(input) {
   s.bank.lastGoodAccounts = Array.isArray(s.bank.lastGoodAccounts) ? s.bank.lastGoodAccounts : [];
   s.bank.installId = String(s.bank.installId || '');
   if (!s.bank.installId) s.bank.installId = `install-${uid()}`;
-  s.meta = { ...(s.meta || {}), appVersion: '1.8.8', firstOpen: Boolean(s.meta?.firstOpen), setupComplete: Boolean(s.meta?.setupComplete) };
+  s.meta = { ...(s.meta || {}), appVersion: '1.8.9', firstOpen: Boolean(s.meta?.firstOpen), setupComplete: Boolean(s.meta?.setupComplete) };
   return s;
 }
 
@@ -1235,8 +1235,23 @@ function bankApiConfigured() {
   return /^https:\/\//i.test(BANK_API_URL);
 }
 
-function totalBankBalance() {
-  return (state.bank.accounts || []).reduce((sum, account) => sum + (Number.isFinite(Number(account.balance)) ? Number(account.balance) : 0), 0);
+function nullableMoneyNumber(value) {
+  // IMPORTANT: Number(null) and Number('') are 0 in JavaScript. A bank API can
+  // temporarily return null/missing balance data, and that must never become a
+  // real zero balance in Nexora.
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function totalBankBalance(accounts = state.bank.accounts || []) {
+  const values = (accounts || []).map(account => nullableMoneyNumber(account?.balance)).filter(value => value !== null);
+  if (!values.length) {
+    const fallbackValues = (state.bank.lastGoodAccounts || []).map(account => nullableMoneyNumber(account?.balance)).filter(value => value !== null);
+    if (!fallbackValues.length) return null;
+    return fallbackValues.reduce((sum, value) => sum + value, 0);
+  }
+  return values.reduce((sum, value) => sum + value, 0);
 }
 
 function bankAccountTypeLabel(account) {
@@ -1315,7 +1330,10 @@ function shouldAutoSync(minAgeMs = 30000) {
   const now = Date.now();
   if (now - bankLastAttempt < 8000) return false;
   const last = state.bank.lastSync ? new Date(state.bank.lastSync).getTime() : 0;
-  return !last || now - last >= minAgeMs;
+  // Do not hammer the bank every time Android resumes the WebView. Manual Sync is
+  // always available, while passive foreground refreshes are capped to 5 minutes.
+  const safeMinAge = Math.max(Number(minAgeMs || 0), 5 * 60 * 1000);
+  return !last || now - last >= safeMinAge;
 }
 
 function requestAutoSync(minAgeMs = 30000) {
@@ -1350,10 +1368,11 @@ function bankCardMarkup() {
   const renewText = lang() === 'et'
     ? 'Panga antud ligipääs lõppes. Sinu viimane salvestatud seis jääb alles — kinnita ühendus pangas uuesti.'
     : 'The bank authorization has ended. Your last saved data is kept — confirm access with your bank again.';
+  const bankTotal = totalBankBalance(accounts);
   return `<section class="card bank-card ${state.bank.connected && !renew ? 'bank-connected' : ''}">
-    <div class="bank-card-head"><div><div class="label">${renew ? renewTitle : b('bankConnected')}</div><h3 ${accounts.length ? `data-money-key="bank-total" data-money-value="${Number(totalBankBalance())}"` : ''}>${accounts.length ? money(totalBankBalance()) : b('bankPending')}</h3></div><span class="bank-shield">${renew ? '!' : '✓'}</span></div>
+    <div class="bank-card-head"><div><div class="label">${renew ? renewTitle : b('bankConnected')}</div><h3 ${bankTotal !== null ? `data-money-key="bank-total" data-money-value="${bankTotal}"` : ''}>${accounts.length ? (bankTotal !== null ? money(bankTotal) : '—') : b('bankPending')}</h3></div><span class="bank-shield">${renew ? '!' : '✓'}</span></div>
     ${accounts.length ? `<div class="bank-accounts">${accounts.map(a => `<div class="bank-account-row"><div class="bank-account-copy"><strong class="bank-account-name">${esc(bankAccountDisplayName(a))}</strong><span class="bank-account-meta">${esc(bankAccountMeta(a))}</span></div><strong class="bank-account-balance" ${a.balance == null ? '' : `data-money-key="bank-account-${esc(a.id)}" data-money-value="${Number(a.balance)}"`}>${a.balance == null ? '—' : money(a.balance)}</strong></div>`).join('')}</div>` : `<p class="small muted">${b('bankPending')}</p>`}
-    ${renew ? `<div class="bank-connect-error"><strong>${renewTitle}</strong><span>${renewText}</span></div>` : (state.bank.syncWarning ? `<div class="bank-connect-error"><strong>${lang()==='et'?'Tehingute sünk vajab tähelepanu':'Transaction sync needs attention'}</strong><span>${esc(state.bank.syncWarning)}</span></div>` : '')}
+    ${renew ? `<div class="bank-connect-error"><strong>${renewTitle}</strong><span>${renewText}</span></div>` : (state.bank.syncWarning ? `<div class="bank-connect-error"><strong>${lang()==='et'?'Panga sünk vajab tähelepanu':'Bank sync needs attention'}</strong><span>${esc(state.bank.syncWarning)}</span></div>` : '')}
     <div class="bank-meta"><span>${b('lastSync')}: ${state.bank.lastSync ? new Intl.DateTimeFormat(locale(), {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}).format(new Date(state.bank.lastSync)) : '—'}</span><span>${renew ? (lang()==='et'?'Viimane salvestatud seis':'Last saved state') : b('syncedAutomatically')}</span></div>
     <div class="actions">${renew ? `<button class="primary" data-reauthorize-bank>${lang()==='et'?'Ühenda uuesti':'Reconnect bank'}</button>` : `<button class="primary" data-sync-bank ${bankBusy?'disabled':''}>${bankBusy ? b('bankSyncing') : b('syncNow')}</button>`}<button class="secondary" data-disconnect-bank>${b('disconnectBank')}</button></div>
   </section>`;
@@ -1495,8 +1514,8 @@ function mergeBankAccounts(incoming) {
   return rows.map(account => {
     const id = String(account?.id || '');
     const old = previousByStable.get(bankAccountStableKey(account)) || previousById.get(id) || {};
-    const incomingBalance = Number(account?.balance);
-    const previousBalance = Number(old?.balance);
+    const incomingBalance = nullableMoneyNumber(account?.balance);
+    const previousBalance = nullableMoneyNumber(old?.balance);
     return {
       ...old,
       ...account,
@@ -1504,7 +1523,9 @@ function mergeBankAccounts(incoming) {
       name: String(account?.name || old?.name || ''),
       iban: String(account?.iban || old?.iban || ''),
       account_type: String(account?.account_type || old?.account_type || ''),
-      balance: Number.isFinite(incomingBalance) ? incomingBalance : (Number.isFinite(previousBalance) ? previousBalance : null)
+      // Missing/null bank data means "unknown right now", not €0. Keep the
+      // last trustworthy value until the bank returns a fresh balance.
+      balance: incomingBalance !== null ? incomingBalance : (previousBalance !== null ? previousBalance : null)
     };
   });
 }
@@ -1947,7 +1968,7 @@ const views = {
       <section class="card brand-card">
         <img class="brand-wordmark dark-logo" src="nexora-wordmark-dark.png" alt="Nexora" />
         <img class="brand-wordmark light-logo" src="nexora-wordmark-light.png" alt="Nexora" />
-        <div class="brand-version">Nexora · 1.8.8</div>
+        <div class="brand-version">Nexora · 1.8.9</div>
       </section>
       <section class="card">
         <div class="section-title"><h3>${t('statistics')}</h3></div>

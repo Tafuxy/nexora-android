@@ -167,11 +167,28 @@ export default {
         const warnings = [];
         const psuHeaders = buildPsuHeaders(request);
         for (const accountId of session.accounts || []) {
-          const [details, balances] = await Promise.all([
-            safeEb(env, `/accounts/${encodeURIComponent(accountId)}/details`),
-            safeEb(env, `/accounts/${encodeURIComponent(accountId)}/balances`)
+          // This request is initiated by the user in Nexora, so forward PSU headers
+          // to *all* account-information endpoints. Previously transactions got PSU
+          // headers but details/balances did not, which could make the bank treat balance
+          // refreshes as background access and rate-limit them.
+          const [detailsResult, balancesResult] = await Promise.allSettled([
+            eb(env, `/accounts/${encodeURIComponent(accountId)}/details`, { headers: psuHeaders }),
+            eb(env, `/accounts/${encodeURIComponent(accountId)}/balances`, { headers: psuHeaders })
           ]);
 
+          const detailsError = detailsResult.status === 'rejected' ? detailsResult.reason : null;
+          const balancesError = balancesResult.status === 'rejected' ? balancesResult.reason : null;
+          if (detailsError && needsReauthorization(detailsError)) {
+            return json({ connected: false, status: sessionStatusFromError(detailsError), reauthorization_required: true, reason: 'bank_authorization_ended', accounts: [], transactions: [] });
+          }
+          if (balancesError && needsReauthorization(balancesError)) {
+            return json({ connected: false, status: sessionStatusFromError(balancesError), reauthorization_required: true, reason: 'bank_authorization_ended', accounts: [], transactions: [] });
+          }
+
+          const details = detailsResult.status === 'fulfilled' ? detailsResult.value : null;
+          const balances = balancesResult.status === 'fulfilled' ? balancesResult.value : null;
+          if (detailsError) warnings.push(accountFetchWarning('details', detailsError));
+          if (balancesError) warnings.push(accountFetchWarning('balance', balancesError));
           const selectedBalance = pickBalance(balances?.balances || []);
           const bankAlias = String(payload?.aliases?.[accountId] || accountAliasFromResource(details) || '').trim();
           const typeCode = String(payload?.account_types?.[accountId] || accountTypeCode(details) || '').trim();
@@ -185,6 +202,7 @@ export default {
             owner_name: details?.name || '',
             currency: selectedBalance?.currency || details?.currency || 'EUR',
             balance: numberOrNull(selectedBalance?.amount),
+            balance_fresh: numberOrNull(selectedBalance?.amount) !== null,
             institution_id: session.aspsp?.name || payload.bank || ''
           });
 
@@ -365,8 +383,8 @@ async function eb(env, path, options = {}) {
   return data;
 }
 
-async function safeEb(env, path) {
-  try { return await eb(env, path); }
+async function safeEb(env, path, options = {}) {
+  try { return await eb(env, path, options); }
   catch { return null; }
 }
 
@@ -521,14 +539,33 @@ function buildPsuHeaders(request) {
 function pickBalance(list) {
   if (!Array.isArray(list) || !list.length) return null;
   const priorities = ['CLAV', 'CLBD', 'ITAV', 'ITBD', 'OPAV', 'OPBD'];
-  const found = priorities.map(type => list.find(x => x.balance_type === type)).find(Boolean) || list[0];
-  const amt = found?.balance_amount || {};
-  return { amount: amt.amount, currency: amt.currency || 'EUR', type: found?.balance_type || '' };
+  const typeOf = x => String(x?.balance_type || x?.balanceType || '').toUpperCase();
+  const found = priorities.map(type => list.find(x => typeOf(x) === type)).find(Boolean) || list[0];
+  const amt = found?.balance_amount || found?.balanceAmount || {};
+  return { amount: amt.amount, currency: amt.currency || 'EUR', type: typeOf(found) };
 }
 
 function numberOrNull(v) {
+  // Never coerce a missing bank amount to zero: Number(null) === 0.
+  if (v === null || v === undefined || v === '') return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
+}
+
+function accountFetchWarning(kind, err) {
+  const status = Number(err?.status || 0);
+  const code = enableBankingErrorCode(err);
+  if (status === 429 || code === 'ASPSP_RATE_LIMIT_EXCEEDED') {
+    return kind === 'balance'
+      ? 'Pank piirab hetkel saldopäringuid. Nexora näitab viimast salvestatud saldot.'
+      : 'Pank piirab hetkel kontopäringuid. Nexora näitab viimast salvestatud infot.';
+  }
+  if (status === 422 && code === 'PSU_HEADER_NOT_PROVIDED') {
+    return 'Pank ei aktsepteerinud seekord aktiivse kasutaja päringut. Nexora näitab viimast salvestatud seisu.';
+  }
+  return kind === 'balance'
+    ? 'Värsket saldot ei õnnestunud pangast saada. Nexora näitab viimast salvestatud saldot.'
+    : 'Kontoinfot ei õnnestunud seekord värskendada. Nexora näitab viimast salvestatud seisu.';
 }
 
 function normalizeTransaction(raw, accountId) {
