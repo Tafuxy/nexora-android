@@ -533,8 +533,8 @@ const cleanDefaults = {
   transactions: [],
   bills: [],
   vehicles: [],
-  bank: { installId: '', handle: '', connected: false, institutionId: '', accounts: [], lastGoodAccounts: [], lastSync: '', syncStatus: '', syncWarning: '', lastTotalBalance: null },
-  meta: { firstOpen: true, setupComplete: false, appVersion: '1.8.3' }
+  bank: { installId: '', handle: '', connected: false, institutionId: '', accounts: [], lastGoodAccounts: [], lastSync: '', syncStatus: '', syncWarning: '', reauthorizationRequired: false, lastTotalBalance: null },
+  meta: { firstOpen: true, setupComplete: false, appVersion: '1.8.4' }
 };
 
 const DEMO_TASKS = ['Review today’s priorities', 'Check upcoming car costs'];
@@ -620,9 +620,11 @@ function sanitizeState(input) {
   s.bank = deepMerge(cleanDefaults.bank, s.bank || {});
   s.bank.accounts = Array.isArray(s.bank.accounts) ? s.bank.accounts : [];
   s.bank.lastGoodAccounts = Array.isArray(s.bank.lastGoodAccounts) ? s.bank.lastGoodAccounts : [];
+  s.bank.reauthorizationRequired = Boolean(s.bank.reauthorizationRequired);
+  s.bank.lastGoodAccounts = Array.isArray(s.bank.lastGoodAccounts) ? s.bank.lastGoodAccounts : [];
   s.bank.installId = String(s.bank.installId || '');
   if (!s.bank.installId) s.bank.installId = `install-${uid()}`;
-  s.meta = { ...(s.meta || {}), appVersion: '1.8.3', firstOpen: Boolean(s.meta?.firstOpen), setupComplete: Boolean(s.meta?.setupComplete) };
+  s.meta = { ...(s.meta || {}), appVersion: '1.8.4', firstOpen: Boolean(s.meta?.firstOpen), setupComplete: Boolean(s.meta?.setupComplete) };
   return s;
 }
 
@@ -940,6 +942,8 @@ window.NexoraApp = {
     if (typeof handle === 'string' && handle.length > 20) {
       state.bank.handle = handle;
       state.bank.syncStatus = 'AUTHORIZED';
+      state.bank.reauthorizationRequired = false;
+      state.bank.syncWarning = '';
       saveState(false);
     }
     bankLastAttempt = Date.now();
@@ -1020,9 +1024,28 @@ function render() {
   renderGate();
 }
 
+function normalizedIban(value) {
+  return String(value || '').replace(/\s+/g, '').toUpperCase();
+}
+
+function isInternalBankTransfer(tx) {
+  if (!tx || tx.source !== 'bank') return false;
+  const counterpart = normalizedIban(tx.counterpartyIban);
+  if (!counterpart) return false;
+  return (state.bank.accounts || state.bank.lastGoodAccounts || [])
+    .some(account => normalizedIban(account?.iban) === counterpart);
+}
+
 function monthTransactions() {
   const ym = todayISO().slice(0, 7);
-  return state.transactions.filter(t => String(t.date || '').startsWith(ym));
+  // Monthly income/expense should represent settled money moving in/out of the user's
+  // finances. Pending bank entries and transfers between the user's own connected
+  // accounts stay visible in Transactions but do not inflate income/expense totals.
+  return state.transactions.filter(tx =>
+    String(tx.date || '').startsWith(ym) &&
+    !tx.pending &&
+    !isInternalBankTransfer(tx)
+  );
 }
 
 function spentThisMonth() {
@@ -1203,12 +1226,17 @@ function bankCardMarkup() {
   }
 
   const accounts = state.bank.accounts || [];
-  return `<section class="card bank-card ${state.bank.connected ? 'bank-connected' : ''}">
-    <div class="bank-card-head"><div><div class="label">${b('bankConnected')}</div><h3 ${accounts.length ? `data-money-key="bank-total" data-money-value="${Number(totalBankBalance())}"` : ''}>${accounts.length ? money(totalBankBalance()) : b('bankPending')}</h3></div><span class="bank-shield">✓</span></div>
+  const renew = Boolean(state.bank.reauthorizationRequired);
+  const renewTitle = lang() === 'et' ? 'Pangaühendus vajab uuendamist' : 'Bank connection needs renewal';
+  const renewText = lang() === 'et'
+    ? 'Panga antud ligipääs lõppes. Sinu viimane salvestatud seis jääb alles — kinnita ühendus pangas uuesti.'
+    : 'The bank authorization has ended. Your last saved data is kept — confirm access with your bank again.';
+  return `<section class="card bank-card ${state.bank.connected && !renew ? 'bank-connected' : ''}">
+    <div class="bank-card-head"><div><div class="label">${renew ? renewTitle : b('bankConnected')}</div><h3 ${accounts.length ? `data-money-key="bank-total" data-money-value="${Number(totalBankBalance())}"` : ''}>${accounts.length ? money(totalBankBalance()) : b('bankPending')}</h3></div><span class="bank-shield">${renew ? '!' : '✓'}</span></div>
     ${accounts.length ? `<div class="bank-accounts">${accounts.map(a => `<div class="bank-account-row"><div class="bank-account-copy"><strong class="bank-account-name">${esc(bankAccountDisplayName(a))}</strong><span class="bank-account-meta">${esc(bankAccountMeta(a))}</span></div><strong class="bank-account-balance" ${a.balance == null ? '' : `data-money-key="bank-account-${esc(a.id)}" data-money-value="${Number(a.balance)}"`}>${a.balance == null ? '—' : money(a.balance)}</strong></div>`).join('')}</div>` : `<p class="small muted">${b('bankPending')}</p>`}
-    ${state.bank.syncWarning ? `<div class="bank-connect-error"><strong>${lang()==='et'?'Tehingute sünk vajab tähelepanu':'Transaction sync needs attention'}</strong><span>${esc(state.bank.syncWarning)}</span></div>` : ''}
-    <div class="bank-meta"><span>${b('lastSync')}: ${state.bank.lastSync ? new Intl.DateTimeFormat(locale(), {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}).format(new Date(state.bank.lastSync)) : '—'}</span><span>${b('syncedAutomatically')}</span></div>
-    <div class="actions"><button class="primary" data-sync-bank ${bankBusy?'disabled':''}>${bankBusy ? b('bankSyncing') : b('syncNow')}</button><button class="secondary" data-disconnect-bank>${b('disconnectBank')}</button></div>
+    ${renew ? `<div class="bank-connect-error"><strong>${renewTitle}</strong><span>${renewText}</span></div>` : (state.bank.syncWarning ? `<div class="bank-connect-error"><strong>${lang()==='et'?'Tehingute sünk vajab tähelepanu':'Transaction sync needs attention'}</strong><span>${esc(state.bank.syncWarning)}</span></div>` : '')}
+    <div class="bank-meta"><span>${b('lastSync')}: ${state.bank.lastSync ? new Intl.DateTimeFormat(locale(), {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}).format(new Date(state.bank.lastSync)) : '—'}</span><span>${renew ? (lang()==='et'?'Viimane salvestatud seis':'Last saved state') : b('syncedAutomatically')}</span></div>
+    <div class="actions">${renew ? `<button class="primary" data-reauthorize-bank>${lang()==='et'?'Ühenda uuesti':'Reconnect bank'}</button>` : `<button class="primary" data-sync-bank ${bankBusy?'disabled':''}>${bankBusy ? b('bankSyncing') : b('syncNow')}</button>`}<button class="secondary" data-disconnect-bank>${b('disconnectBank')}</button></div>
   </section>`;
 }
 
@@ -1279,6 +1307,7 @@ async function connectBank(institutionId) {
     state.bank.handle = data.bank_handle || '';
     state.bank.institutionId = institutionId;
     state.bank.syncStatus = data.requisition_status || '';
+    state.bank.syncWarning = '';
     saveState(false);
 
     if (!openExternalUrl(authorizationUrl)) {
@@ -1316,6 +1345,8 @@ function mergeBankTransactions(incoming) {
       note: raw.merchant || raw.note || existing?.note || '',
       bankKey: raw.bank_key,
       bankAccountId: raw.account_id || '',
+      counterpartyIban: raw.counterparty_iban || existing?.counterpartyIban || '',
+      bankStatus: raw.status || existing?.bankStatus || '',
       source: 'bank',
       pending: Boolean(raw.pending)
     };
@@ -1324,15 +1355,24 @@ function mergeBankTransactions(incoming) {
   return newlyAdded;
 }
 
+function bankAccountStableKey(account) {
+  const hash = String(account?.identification_hash || '').trim();
+  if (hash) return `hash:${hash}`;
+  const iban = String(account?.iban || '').replace(/\s+/g, '').toUpperCase();
+  if (iban) return `iban:${iban}`;
+  return `id:${String(account?.id || '')}`;
+}
+
 function mergeBankAccounts(incoming) {
   const priorRows = (state.bank.accounts || []).length ? state.bank.accounts : (state.bank.lastGoodAccounts || []);
-  const previous = new Map(priorRows.map(account => [String(account?.id || ''), account]));
+  const previousByStable = new Map(priorRows.map(account => [bankAccountStableKey(account), account]));
+  const previousById = new Map(priorRows.map(account => [String(account?.id || ''), account]));
   const rows = Array.isArray(incoming) ? incoming : [];
-  if (!rows.length && previous.size) return priorRows;
+  if (!rows.length && priorRows.length) return priorRows;
 
   return rows.map(account => {
     const id = String(account?.id || '');
-    const old = previous.get(id) || {};
+    const old = previousByStable.get(bankAccountStableKey(account)) || previousById.get(id) || {};
     const incomingBalance = Number(account?.balance);
     const previousBalance = Number(old?.balance);
     return {
@@ -1365,6 +1405,18 @@ async function syncBank(renderDuring = true) {
       body: JSON.stringify({ install_id: state.bank.installId, bank_handle: state.bank.handle })
     });
 
+    // A closed/expired bank authorization is not a data-loss event. Keep the last good state
+    // and offer a clean re-authorisation flow instead of showing provider UUID/error text.
+    if (data?.reauthorization_required) {
+      state.bank.connected = false;
+      state.bank.reauthorizationRequired = true;
+      state.bank.syncStatus = String(data?.status || 'REAUTHORIZATION_REQUIRED');
+      state.bank.syncWarning = '';
+      gateError = '';
+      saveState(false);
+      return;
+    }
+
     // A temporary authorization/API problem must never erase the last trustworthy bank state.
     if (!data || data.connected !== true) {
       const status = String(data?.status || 'SYNC_UNAVAILABLE');
@@ -1384,6 +1436,7 @@ async function syncBank(renderDuring = true) {
     }
 
     state.bank.connected = true;
+    state.bank.reauthorizationRequired = false;
     state.bank.syncStatus = data.status || 'AUTHORIZED';
     state.bank.accounts = safeAccounts;
     if (safeAccounts.length) state.bank.lastGoodAccounts = clone(safeAccounts);
@@ -1396,9 +1449,18 @@ async function syncBank(renderDuring = true) {
     saveState(false);
     syncNativeNotificationConfig(false);
   } catch (error) {
-    // Keep accounts, balances and transactions exactly as they were on the last good sync.
-    state.bank.syncStatus = 'error';
-    state.bank.syncWarning = error?.message || b('bankError');
+    // Older backend errors may still surface a provider message. Convert closed/expired sessions
+    // into a user-friendly reconnect state and never expose the provider session UUID.
+    const rawMessage = String(error?.message || '');
+    if (/session is (closed|expired)|CLOSED_SESSION|EXPIRED_SESSION/i.test(rawMessage)) {
+      state.bank.connected = false;
+      state.bank.reauthorizationRequired = true;
+      state.bank.syncStatus = /expired/i.test(rawMessage) ? 'EXPIRED' : 'CLOSED';
+      state.bank.syncWarning = '';
+    } else {
+      state.bank.syncStatus = 'error';
+      state.bank.syncWarning = rawMessage || b('bankError');
+    }
     gateError = '';
     saveState(false);
   } finally {
@@ -1427,6 +1489,7 @@ async function disconnectBank() {
   state.bank.lastSync = '';
   state.bank.syncStatus = '';
   state.bank.syncWarning = '';
+  state.bank.reauthorizationRequired = false;
   bankBusy = false;
   saveState();
 }
@@ -1712,7 +1775,7 @@ const views = {
       <section class="card brand-card">
         <img class="brand-wordmark dark-logo" src="nexora-wordmark-dark.png" alt="Nexora" />
         <img class="brand-wordmark light-logo" src="nexora-wordmark-light.png" alt="Nexora" />
-        <div class="brand-version">Nexora · 1.8.2</div>
+        <div class="brand-version">Nexora · 1.8.5</div>
       </section>
       <section class="card">
         <div class="section-title"><h3>${t('statistics')}</h3></div>
@@ -1905,6 +1968,7 @@ function bindView() {
   $('[data-export]')?.addEventListener('click', exportData);
   $('[data-reset]')?.addEventListener('click', resetData);
   $('[data-connect-bank]')?.addEventListener('click', openBankPicker);
+  $('[data-reauthorize-bank]')?.addEventListener('click', openBankPicker);
   $('[data-sync-bank]')?.addEventListener('click', () => syncBank(true));
   $('[data-disconnect-bank]')?.addEventListener('click', disconnectBank);
 }

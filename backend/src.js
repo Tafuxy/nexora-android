@@ -133,11 +133,35 @@ export default {
           return json({ connected: false, status: 'PENDING_AUTHORIZATION', accounts: [], transactions: [] });
         }
 
-        const session = await eb(env, `/sessions/${encodeURIComponent(payload.sid)}`);
+        let session;
+        try {
+          session = await eb(env, `/sessions/${encodeURIComponent(payload.sid)}`);
+        } catch (err) {
+          if (needsReauthorization(err)) {
+            return json({
+              connected: false,
+              status: sessionStatusFromError(err),
+              reauthorization_required: true,
+              reason: 'bank_authorization_ended',
+              accounts: [],
+              transactions: []
+            });
+          }
+          throw err;
+        }
         if (session.status !== 'AUTHORIZED') {
-          return json({ connected: false, status: session.status || 'UNKNOWN', accounts: [], transactions: [] });
+          const mustReauthorize = ['CLOSED', 'EXPIRED', 'REVOKED', 'INVALID', 'CANCELLED'].includes(String(session.status || '').toUpperCase());
+          return json({
+            connected: false,
+            status: session.status || 'UNKNOWN',
+            reauthorization_required: mustReauthorize,
+            reason: mustReauthorize ? 'bank_authorization_ended' : 'bank_unavailable',
+            accounts: [],
+            transactions: []
+          });
         }
 
+        const stableHashByUid = new Map((session.accounts_data || []).map(row => [String(row?.uid || ''), String(row?.identification_hash || '')]));
         const accounts = [];
         const transactions = [];
         const warnings = [];
@@ -153,6 +177,7 @@ export default {
           const typeCode = String(payload?.account_types?.[accountId] || accountTypeCode(details) || '').trim();
           accounts.push({
             id: accountId,
+            identification_hash: String(details?.identification_hash || stableHashByUid.get(String(accountId)) || ''),
             iban: details?.account_id?.iban || '',
             display_name: bankAlias,
             name: bankAlias || details?.details || details?.product || 'Bank account',
@@ -164,6 +189,16 @@ export default {
           });
 
           const txResult = await fetchTransactions(env, accountId, psuHeaders);
+          if (txResult.reauthorization_required) {
+            return json({
+              connected: false,
+              status: txResult.status || 'CLOSED',
+              reauthorization_required: true,
+              reason: 'bank_authorization_ended',
+              accounts: [],
+              transactions: []
+            });
+          }
           if (txResult.warning) warnings.push(`${accountId}: ${txResult.warning}`);
           for (const raw of txResult.transactions) {
             const normalized = normalizeTransaction(raw, accountId);
@@ -179,6 +214,11 @@ export default {
           accounts,
           transactions,
           transaction_count: transactions.length,
+          transaction_access: Boolean(session?.access?.transactions),
+          transaction_range: {
+            date_from: new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() - 1, 1)).toISOString().slice(0, 10),
+            date_to: new Date().toISOString().slice(0, 10)
+          },
           warnings,
           synced_at: new Date().toISOString()
         });
@@ -369,11 +409,16 @@ function pemToDer(pem, label) {
 }
 
 async function fetchTransactions(env, accountId, psuHeaders = {}) {
-  const dateFrom = new Date(Date.now() - 120 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+  // Nexora only needs recent transactions for the monthly overview. Swedbank requires
+  // additional SCA for archive transactions older than 90 days, so never start with
+  // `strategy=longest` or an over-90-day range. Those requests can turn a simple
+  // current-month sync into an SCA/rate-limit failure while balances still work.
+  const now = new Date();
+  const dateTo = now.toISOString().slice(0, 10);
+  const dateFrom = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1)).toISOString().slice(0, 10);
   const attempts = [
-    { date_from: dateFrom, strategy: 'longest' },
+    { date_from: dateFrom, date_to: dateTo },
     { date_from: dateFrom },
-    { strategy: 'longest' },
     {}
   ];
   let lastError = null;
@@ -386,7 +431,8 @@ async function fetchTransactions(env, accountId, psuHeaders = {}) {
       for (let page = 0; page < 10; page++) {
         const qs = new URLSearchParams(baseParams);
         if (continuation) qs.set('continuation_key', continuation);
-        const data = await eb(env, `/accounts/${encodeURIComponent(accountId)}/transactions?${qs.toString()}`, { headers: psuHeaders });
+        const suffix = qs.toString();
+        const data = await eb(env, `/accounts/${encodeURIComponent(accountId)}/transactions${suffix ? `?${suffix}` : ''}`, { headers: psuHeaders });
         for (const tx of (Array.isArray(data.transactions) ? data.transactions : [])) {
           const key = String(tx?.transaction_id || tx?.entry_reference || JSON.stringify(tx));
           if (seen.has(key)) continue;
@@ -396,13 +442,57 @@ async function fetchTransactions(env, accountId, psuHeaders = {}) {
         continuation = String(data.continuation_key || '');
         if (!continuation) break;
       }
-      return { transactions: out, warning: '' };
+      return { transactions: out, warning: '', range: { date_from: dateFrom, date_to: dateTo } };
     } catch (err) {
+      if (needsReauthorization(err)) {
+        return {
+          transactions: [],
+          warning: '',
+          reauthorization_required: true,
+          status: sessionStatusFromError(err)
+        };
+      }
       lastError = err;
     }
   }
 
-  return { transactions: [], warning: lastError?.message || 'Transactions could not be fetched' };
+  return {
+    transactions: [],
+    warning: lastError?.message || 'Transactions could not be fetched',
+    reauthorization_required: false,
+    range: { date_from: dateFrom, date_to: dateTo }
+  };
+}
+
+function enableBankingErrorCode(err) {
+  const details = err?.details || {};
+  const candidates = [
+    details?.code,
+    details?.error_code,
+    details?.error?.code,
+    details?.detail?.code,
+    details?.detail?.error_code,
+    err?.code
+  ];
+  for (const value of candidates) {
+    const code = String(value || '').trim().toUpperCase();
+    if (code) return code;
+  }
+  return '';
+}
+
+function needsReauthorization(err) {
+  const code = enableBankingErrorCode(err);
+  if (['CLOSED_SESSION', 'EXPIRED_SESSION'].includes(code)) return true;
+  const message = String(err?.message || '').toLowerCase();
+  return message.includes('session is closed') || message.includes('session is expired');
+}
+
+function sessionStatusFromError(err) {
+  const code = enableBankingErrorCode(err);
+  if (code === 'EXPIRED_SESSION' || String(err?.message || '').toLowerCase().includes('expired')) return 'EXPIRED';
+  if (code === 'CLOSED_SESSION' || String(err?.message || '').toLowerCase().includes('closed')) return 'CLOSED';
+  return 'REAUTHORIZATION_REQUIRED';
 }
 
 function buildPsuHeaders(request) {
@@ -448,7 +538,10 @@ function normalizeTransaction(raw, accountId) {
   const date = raw.transaction_date || raw.transactionDate || raw.booking_date || raw.bookingDate || raw.value_date || raw.valueDate || new Date().toISOString().slice(0, 10);
   const debtor = raw?.debtor?.name || raw?.debtorName || '';
   const creditor = raw?.creditor?.name || raw?.creditorName || '';
+  const debtorIban = String(raw?.debtor_account?.iban || raw?.debtorAccount?.iban || '').replace(/\s+/g, '').toUpperCase();
+  const creditorIban = String(raw?.creditor_account?.iban || raw?.creditorAccount?.iban || '').replace(/\s+/g, '').toUpperCase();
   const partyName = isCredit ? debtor : creditor;
+  const counterpartyIban = isCredit ? debtorIban : creditorIban;
   const remittanceRaw = raw.remittance_information ?? raw.remittanceInformation ?? '';
   const remittance = Array.isArray(remittanceRaw) ? remittanceRaw.filter(Boolean).join(' · ') : String(remittanceRaw || '');
   const btc = raw?.bank_transaction_code || raw?.bankTransactionCode || {};
@@ -470,6 +563,8 @@ function normalizeTransaction(raw, accountId) {
     merchant,
     note,
     pending,
+    counterparty_iban: counterpartyIban,
+    status: status || '',
     category: classify(merchant, note, signedAmount)
   };
 }
@@ -715,9 +810,19 @@ async function pollOneRegistration(env, registration) {
     throw httpError(403, 'Stored push registration no longer matches the bank session');
   }
 
-  const session = await eb(env, `/sessions/${encodeURIComponent(payload.sid)}`);
+  let session;
+  try {
+    session = await eb(env, `/sessions/${encodeURIComponent(payload.sid)}`);
+  } catch (err) {
+    if (needsReauthorization(err)) throw httpError(409, 'Bank authorization needs renewal', { reauthorization_required: true, status: sessionStatusFromError(err) });
+    throw err;
+  }
   if (session.status !== 'AUTHORIZED') {
-    throw httpError(401, `Bank session is ${session.status || 'not authorized'}`);
+    const status = String(session.status || 'not authorized');
+    if (['CLOSED', 'EXPIRED', 'REVOKED', 'INVALID', 'CANCELLED'].includes(status.toUpperCase())) {
+      throw httpError(409, 'Bank authorization needs renewal', { reauthorization_required: true, status });
+    }
+    throw httpError(401, `Bank session is ${status}`);
   }
 
   const transactions = [];
